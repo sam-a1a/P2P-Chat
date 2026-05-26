@@ -9,9 +9,6 @@ pub struct MessageStore {
 }
 
 impl MessageStore {
-    /// Opens (or creates) the SQLite database at `path`.
-    /// Uses rusqlite with the **bundled** feature so the binary carries its
-    /// own SQLite — no system library required on Android or iOS.
     pub fn open(path: &str) -> Result<Self> {
         let conn =
             Connection::open(path).map_err(|e| P2pError::Storage(e.to_string()))?;

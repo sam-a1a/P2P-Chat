@@ -15,10 +15,6 @@ use tokio::sync::{mpsc, watch};
 const LISTEN_ADDR: &str = "/ip4/0.0.0.0/tcp/0";
 const PROTOCOL_VERSION: &str = "/p2p-chat/1.0.0";
 
-// Public handle (given to callers / FFI)
-
-/// Thread-safe handle returned after starting the node.
-/// The caller drives it by sending NodeCommands and receiving NodeEvents.
 pub struct NodeHandle {
     pub command_tx: mpsc::UnboundedSender<NodeCommand>,
     pub event_rx:   mpsc::UnboundedReceiver<NodeEvent>,
@@ -37,13 +33,10 @@ impl NodeHandle {
         });
     }
 
-    /// Signals the event loop to stop.  Idempotent.
     pub fn shutdown(&self) {
         let _ = self.shutdown_tx.send(true);
     }
 }
-
-// Internal node
 
 struct Node {
     swarm:      Swarm<ChatBehaviour>,
@@ -53,8 +46,6 @@ struct Node {
 }
 
 impl Node {
-    /// Starts listening and runs the event loop until shutdown is signalled
-    /// or the command channel is dropped.
     pub async fn run(mut self) {
         if let Err(e) = self
             .swarm
@@ -69,16 +60,12 @@ impl Node {
         loop {
             tokio::select! {
                 biased;
-
-                // ── Shutdown signal ───────────────────────────────────────
                 Ok(_) = self.shutdown_rx.changed() => {
                     if *self.shutdown_rx.borrow() {
                         log::info!("node: shutdown signal received");
                         break;
                     }
                 }
-
-                // ── Inbound commands from the app layer ───────────────────
                 cmd = self.command_rx.recv() => {
                     match cmd {
                         Some(NodeCommand::Subscribe(topic)) => {
@@ -93,8 +80,6 @@ impl Node {
                         }
                     }
                 }
-
-                // ── Swarm events ──────────────────────────────────────────
                 event = self.swarm.select_next_some() => {
                     self.handle_swarm_event(event);
                 }
@@ -128,15 +113,12 @@ impl Node {
 
     fn handle_swarm_event(&mut self, event: SwarmEvent<ChatBehaviourEvent>) {
         match event {
-            // ── Listening ─────────────────────────────────────────────────
             SwarmEvent::NewListenAddr { address, .. } => {
                 log::info!("listening on {address}");
                 let _ = self.event_tx.send(NodeEvent::ListeningOn {
                     address: address.to_string(),
                 });
             }
-
-            // ── Connection lifecycle ───────────────────────────────────────
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 log::info!("connected: {peer_id}");
                 let _ = self.event_tx.send(NodeEvent::ConnectionEstablished {
@@ -150,22 +132,16 @@ impl Node {
                     peer: peer_id.to_string(),
                 });
             }
-
-            // ── Behaviour events ───────────────────────────────────────────
             SwarmEvent::Behaviour(bev) => self.handle_behaviour_event(bev),
-
             _ => {}
         }
     }
 
     fn handle_behaviour_event(&mut self, event: ChatBehaviourEvent) {
         match event {
-            // ── mDNS ──────────────────────────────────────────────────────
             ChatBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
                 for (peer_id, addr) in peers {
                     log::info!("mDNS discovered {peer_id} @ {addr}");
-                    // Explicitly tell Gossipsub about the new peer so it can
-                    // include them in the mesh before the first heartbeat.
                     self.swarm
                         .behaviour_mut()
                         .gossipsub
@@ -187,8 +163,6 @@ impl Node {
                     });
                 }
             }
-
-            // ── Gossipsub ─────────────────────────────────────────────────
             ChatBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                                               propagation_source,
                                               message,
@@ -201,12 +175,9 @@ impl Node {
                 );
                 let _ = self.event_tx.send(NodeEvent::MessageReceived(msg));
             }
-
             ChatBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic }) => {
                 log::debug!("{peer_id} subscribed to {topic}");
             }
-
-            // ── Identify ──────────────────────────────────────────────────
             ChatBehaviourEvent::Identify(identify::Event::Received { peer_id, info, .. }) => {
                 log::debug!(
                     "identified {peer_id}: agent={} protos={:?}",
@@ -214,28 +185,32 @@ impl Node {
                     info.protocols
                 );
             }
-
             _ => {}
         }
     }
 }
 
-// Builder / entry point
-
-/// Builds the swarm, starts the event loop as a Tokio task, and returns a
-/// NodeHandle for the caller to send commands and receive events.
 pub fn start_node(keypair: libp2p::identity::Keypair) -> Result<NodeHandle> {
     let swarm = build_swarm(keypair)?;
 
-    let (event_tx,   event_rx)   = mpsc::unbounded_channel();
+    let (event_tx, event_rx) = mpsc::unbounded_channel();
     let (command_tx, command_rx) = mpsc::unbounded_channel();
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    let node = Node { swarm, event_tx, command_rx, shutdown_rx };
+    let node = Node {
+        swarm,
+        event_tx,
+        command_rx,
+        shutdown_rx,
+    };
 
     tokio::spawn(node.run());
 
-    Ok(NodeHandle { command_tx, event_rx, shutdown_tx })
+    Ok(NodeHandle {
+        command_tx,
+        event_rx,
+        shutdown_tx,
+    })
 }
 
 fn build_swarm(keypair: libp2p::identity::Keypair) -> Result<Swarm<ChatBehaviour>> {
@@ -247,7 +222,7 @@ fn build_swarm(keypair: libp2p::identity::Keypair) -> Result<Swarm<ChatBehaviour
             yamux::Config::default,
         )
         .map_err(|e| P2pError::Transport(e.to_string()))?
-        .with_behaviour(|key| -> anyhow::Result<ChatBehaviour> {
+        .with_behaviour(|key| {
             let gossipsub_cfg = gossipsub::ConfigBuilder::default()
                 .heartbeat_interval(Duration::from_secs(10))
                 .validation_mode(gossipsub::ValidationMode::Strict)
@@ -263,20 +238,22 @@ fn build_swarm(keypair: libp2p::identity::Keypair) -> Result<Swarm<ChatBehaviour
             let mdns = mdns::tokio::Behaviour::new(
                 mdns::Config::default(),
                 key.public().to_peer_id(),
-            )?;
+            )
+                .map_err(|e| anyhow::anyhow!("mdns: {e}"))?;
 
             let identify = identify::Behaviour::new(identify::Config::new(
                 PROTOCOL_VERSION.to_string(),
                 key.public(),
             ));
 
-            Ok(ChatBehaviour { gossipsub, mdns, identify })
+            Ok(ChatBehaviour {
+                gossipsub,
+                mdns,
+                identify,
+            })
         })
         .map_err(|e| P2pError::Behaviour(e.to_string()))?
         .with_swarm_config(|c| {
-            // Keep idle connections alive — mobile peers reconnect after
-            // the OS resumes the app; we don't want the remote to have
-            // already torn the connection down.
             c.with_idle_connection_timeout(Duration::from_secs(60))
         })
         .build();

@@ -3,7 +3,7 @@ use libp2p::identity::Keypair;
 use zeroize::Zeroizing;
 
 /// Loads a keypair from path, or generates a fresh Ed25519 keypair and
-/// persists it there.  The key bytes are zeroised from memory on drop.
+/// persists it there. The key bytes are zeroised from memory on drop.
 pub fn load_or_create_keypair(path: &str) -> Result<Keypair> {
     let p = std::path::Path::new(path);
 
