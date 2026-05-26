@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 // Wire message
 
 /// A chat message as it travels over Gossipsub.
-/// `ciphertext` is a Megolm-encrypted payload (see crypto module).
+/// ciphertext is a Megolm-encrypted payload (see crypto module).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub id: String,
