@@ -13,8 +13,8 @@ pub mod android;
 #[cfg(target_os = "ios")]
 pub mod ios;
 
-use crate::{identity, node, types::NodeEvent};
-use std::ffi::{CStr, CString};
+use crate::{identity, node};
+use std::ffi::{CString};
 use std::os::raw::c_char;
 use std::sync::OnceLock;
 use tokio::runtime::Runtime;
