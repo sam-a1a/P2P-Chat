@@ -2256,7 +2256,6 @@ dependencies = [
  "jni",
  "libp2p",
  "log",
- "once_cell",
  "postcard",
  "rusqlite",
  "serde",

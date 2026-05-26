@@ -14,14 +14,14 @@ pub mod android;
 pub mod ios;
 
 use crate::{identity, node, types::NodeEvent};
-use once_cell::sync::OnceCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::sync::OnceLock;
 use tokio::runtime::Runtime;
 
 // Global Tokio runtime
 
-static RUNTIME: OnceCell<Runtime> = OnceCell::new();
+static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
 pub(super) fn runtime() -> &'static Runtime {
     RUNTIME.get_or_init(|| {
