@@ -13,5 +13,6 @@ cargo ndk \
   --target aarch64-linux-android \
   --target armv7-linux-androideabi \
   --target x86_64-linux-android \
+  --platform 33 \
   --output-dir "$OUTPUT_DIR" \
   build --release
