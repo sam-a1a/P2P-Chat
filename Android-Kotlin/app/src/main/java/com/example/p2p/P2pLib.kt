@@ -2,16 +2,12 @@ package com.example.p2p
 
 object P2pLib {
 
-    val isAvailable: Boolean
-
-    init {
-        isAvailable = try {
-            System.loadLibrary("p2p")
-            true
-        } catch (e: UnsatisfiedLinkError) {
-            android.util.Log.e("P2pLib", "Failed to load native library: ${e.message}")
-            false
-        }
+    val isAvailable: Boolean = try {
+        System.loadLibrary("p2p")
+        true
+    } catch (e: UnsatisfiedLinkError) {
+        android.util.Log.e("P2pLib", "Failed to load native library: ${e.message}")
+        false
     }
 
     external fun start(keyPath: String, dbPath: String): Long
