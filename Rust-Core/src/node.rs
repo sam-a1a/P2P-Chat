@@ -9,13 +9,12 @@ use libp2p::{
     swarm::SwarmEvent,
     tcp, yamux, Swarm,
 };
-#[cfg(not(target_os = "android"))]
 use libp2p::mdns;
 use std::time::Duration;
 use tokio::sync::{mpsc, watch};
 use crate::behaviour::ChatBehaviourEvent;
 
-const LISTEN_ADDR: &str = "/ip4/0.0.0.0/tcp/0";
+const LISTEN_ADDR: &str = "/ip4/0.0.0.0/tcp/53493";
 const PROTOCOL_VERSION: &str = "/p2p-chat/1.0.0";
 
 pub struct NodeHandle {
@@ -34,6 +33,10 @@ impl NodeHandle {
             topic: topic.to_owned(),
             data,
         });
+    }
+
+    pub fn dial(&self, addr: &str) {
+        let _ = self.command_tx.send(NodeCommand::Dial(addr.to_owned()));
     }
 
     pub fn shutdown(&self) {
@@ -77,6 +80,9 @@ impl Node {
                         Some(NodeCommand::Publish { topic, data }) => {
                             self.publish(&topic, data);
                         }
+                        Some(NodeCommand::Dial(addr)) => {
+                            self.dial_peer(&addr);
+                        }
                         Some(NodeCommand::Shutdown) | None => {
                             log::info!("node: command channel closed");
                             break;
@@ -90,6 +96,18 @@ impl Node {
         }
 
         log::info!("node: event loop exited");
+    }
+
+    fn dial_peer(&mut self, addr_str: &str) {
+        match addr_str.parse::<libp2p::Multiaddr>() {
+            Ok(ma) => {
+                log::info!("dialing {}", addr_str);
+                if let Err(e) = self.swarm.dial(ma) {
+                    log::error!("dial error: {e}");
+                }
+            }
+            Err(e) => log::error!("invalid multiaddr '{}': {e}", addr_str),
+        }
     }
 
     fn subscribe(&mut self, topic_name: &str) {
@@ -142,7 +160,6 @@ impl Node {
 
     fn handle_behaviour_event(&mut self, event: ChatBehaviourEvent) {
         match event {
-            #[cfg(not(target_os = "android"))]
             ChatBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
                 for (peer_id, addr) in peers {
                     log::info!("mDNS discovered {peer_id} @ {addr}");
@@ -155,7 +172,6 @@ impl Node {
                     });
                 }
             }
-            #[cfg(not(target_os = "android"))]
             ChatBehaviourEvent::Mdns(mdns::Event::Expired(peers)) => {
                 for (peer_id, _addr) in peers {
                     log::info!("mDNS expired {peer_id}");
@@ -240,7 +256,6 @@ fn build_swarm(keypair: libp2p::identity::Keypair) -> Result<Swarm<ChatBehaviour
             )
                 .map_err(|e| anyhow::anyhow!("gossipsub: {e}"))?;
 
-            #[cfg(not(target_os = "android"))]
             let mdns = mdns::tokio::Behaviour::new(
                 mdns::Config::default(),
                 key.public().to_peer_id(),
@@ -254,7 +269,6 @@ fn build_swarm(keypair: libp2p::identity::Keypair) -> Result<Swarm<ChatBehaviour
 
             Ok(ChatBehaviour {
                 gossipsub,
-                #[cfg(not(target_os = "android"))]
                 mdns,
                 identify,
             })

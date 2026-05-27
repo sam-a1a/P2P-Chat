@@ -1,15 +1,12 @@
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Serializer};
 
-// Wire message
-
-/// A chat message as it travels over Gossipsub.
-/// ciphertext is a Megolm-encrypted payload (see crypto module).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct ChatMessage {
     pub id: String,
-    pub from_peer: String,   // PeerId as string
-    pub topic: String,       // Gossipsub topic name
-    pub ciphertext: Vec<u8>, // Megolm encrypted content
+    pub from_peer: String,
+    pub topic: String,
+    #[serde(serialize_with = "serialize_as_base64")]
+    pub ciphertext: Vec<u8>,
     pub timestamp_secs: u64,
 }
 
@@ -25,19 +22,16 @@ impl ChatMessage {
     }
 }
 
-// Plain (pre-encryption) message
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlainMessage {
-    pub text: String,
+fn serialize_as_base64<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    use base64::Engine as _;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    serializer.serialize_str(&encoded)
 }
 
-// Events emitted by the node to the application layer
-// All libp2p types (PeerId, Multiaddr) are converted to strings here so that
-// the FFI layer can serialise them to JSON with no extra dependencies.
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Serialize)]
 pub enum NodeEvent {
     PeerDiscovered {
         peer: String,
@@ -61,16 +55,12 @@ pub enum NodeEvent {
     },
 }
 
-// Commands sent from the application layer into the node
-
-#[derive(Debug)]
 pub enum NodeCommand {
     Subscribe(String),
     Publish { topic: String, data: Vec<u8> },
+    Dial(String),
     Shutdown,
 }
-
-// Helpers
 
 fn now_secs() -> u64 {
     std::time::SystemTime::now()

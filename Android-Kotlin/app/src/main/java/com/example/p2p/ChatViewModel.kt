@@ -10,12 +10,12 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         node.start(viewModelScope)
-        node.subscribe("chat/global")
+        node.subscribe("chat")
     }
 
     val events = node.events
 
-    fun send(text: String) = node.publishText("chat/global", text)
+    fun send(text: String) = node.publishText("chat", text)
 
     override fun onCleared() {
         node.stop()

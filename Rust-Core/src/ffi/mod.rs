@@ -1,11 +1,5 @@
-// Rust-Core/src/ffi/mod.rs
-
-// Only compile android FFI when targeting Android
-#[cfg(target_os = "android")]
 pub mod android;
 
-// Only compile iOS FFI when targeting iOS
-#[cfg(target_os = "ios")]
 pub mod ios;
 
 use crate::{identity, node};
@@ -31,6 +25,16 @@ pub struct FfiNode {
 }
 
 pub(super) fn ffi_start(key_path: &str, _db_path: &str) -> *mut FfiNode {
+
+    #[cfg(target_os = "android")]
+    {
+        android_logger::init_once(
+            android_logger::Config::default()
+                .with_max_level(log::LevelFilter::Debug)
+                .with_tag("libp2p"),
+        );
+    }
+
     let rt = runtime();
 
     let keypair = match identity::load_or_create_keypair(key_path) {
@@ -48,6 +52,13 @@ pub(super) fn ffi_start(key_path: &str, _db_path: &str) -> *mut FfiNode {
             return std::ptr::null_mut();
         }
     };
+
+    #[cfg(target_os = "android")]
+    {
+        // desktop listens on port 53493 (fixed in node.rs)
+        let desktop_addr = "/ip4/192.168.1.6/tcp/53493";
+        handle.dial(desktop_addr);
+    }
 
     Box::into_raw(Box::new(FfiNode { handle }))
 }
