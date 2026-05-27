@@ -1,33 +1,27 @@
-use super::{
-    FfiNode, ffi_destroy, ffi_free_string, ffi_poll_event,
-    ffi_publish, ffi_shutdown, ffi_start, ffi_subscribe,
-};
-use jni::errors::ThrowRuntimeExAndDefault;
-use jni::objects::{JByteArray, JClass, JString};
+use super::{FfiNode, ffi_destroy, ffi_free_string, ffi_poll_event,
+            ffi_publish, ffi_shutdown, ffi_start, ffi_subscribe};
+use jni::objects::{JClass, JString, JByteArray};
 use jni::sys::{jlong, jstring};
 use jni::EnvUnowned;
-use std::ffi::CStr;
+use jni::errors::ThrowRuntimeExAndDefault;
 
 #[unsafe(no_mangle)]
-#[allow(deprecated)]
-pub extern "system" fn java_com_example_p2p_p2p_lib_start<'local>(
+pub extern "system" fn Java_com_example_p2p_P2pLib_start<'local>(
     mut unowned_env: EnvUnowned<'local>,
     _class: JClass<'local>,
     key_path_j: JString<'local>,
     db_path_j: JString<'local>,
 ) -> jlong {
-    unowned_env
-        .with_env(|env| -> jni::errors::Result<jlong> {
-            let key_path: String = env.get_string(&key_path_j)?.into();
-            let db_path: String = env.get_string(&db_path_j)?.into();
-            Ok(ffi_start(&key_path, &db_path) as jlong)
-        })
-        .resolve::<ThrowRuntimeExAndDefault>()
+    let outcome = unowned_env.with_env(|env| -> Result<jlong, jni::errors::Error> {
+        let key_path: String = key_path_j.to_string();
+        let db_path: String = db_path_j.to_string();
+        Ok(ffi_start(&key_path, &db_path) as jlong)
+    });
+    outcome.resolve::<ThrowRuntimeExAndDefault>()
 }
 
 #[unsafe(no_mangle)]
-#[allow(deprecated)]
-pub extern "system" fn java_com_example_p2p_p2p_lib_poll_event<'local>(
+pub extern "system" fn Java_com_example_p2p_P2pLib_pollEvent<'local>(
     mut unowned_env: EnvUnowned<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -37,55 +31,49 @@ pub extern "system" fn java_com_example_p2p_p2p_lib_poll_event<'local>(
     if raw.is_null() {
         return std::ptr::null_mut();
     }
-    let s = unsafe { CStr::from_ptr(raw) }.to_str().unwrap_or("{}").to_owned();
-    let out = unowned_env
-        .with_env(|env| -> jni::errors::Result<jstring> {
-            Ok(env.new_string(&s)?.into_raw())
-        })
-        .resolve::<ThrowRuntimeExAndDefault>();
+    let s = unsafe { std::ffi::CStr::from_ptr(raw) }.to_str().unwrap_or("{}");
+    let outcome = unowned_env.with_env(|env| -> Result<jstring, jni::errors::Error> {
+        Ok(env.new_string(s)?.into_raw())
+    });
     ffi_free_string(raw);
-    out
+    outcome.resolve::<ThrowRuntimeExAndDefault>()
 }
 
 #[unsafe(no_mangle)]
-#[allow(deprecated)]
-pub extern "system" fn java_com_example_p2p_p2p_lib_subscribe<'local>(
+pub extern "system" fn Java_com_example_p2p_P2pLib_subscribe<'local>(
     mut unowned_env: EnvUnowned<'local>,
     _class: JClass<'local>,
     handle: jlong,
     topic_j: JString<'local>,
 ) {
-    unowned_env
-        .with_env(|env| -> jni::errors::Result<()> {
-            let topic: String = env.get_string(&topic_j)?.into();
-            ffi_subscribe(handle as *mut FfiNode, &topic);
-            Ok(())
-        })
-        .resolve::<ThrowRuntimeExAndDefault>()
+    let outcome = unowned_env.with_env(|env| -> Result<(), jni::errors::Error> {
+        let topic: String = topic_j.to_string();
+        ffi_subscribe(handle as *mut FfiNode, &topic);
+        Ok(())
+    });
+    outcome.resolve::<ThrowRuntimeExAndDefault>()
 }
 
 #[unsafe(no_mangle)]
-#[allow(deprecated)]
-pub extern "system" fn java_com_example_p2p_p2p_lib_publish<'local>(
+pub extern "system" fn Java_com_example_p2p_P2pLib_publish<'local>(
     mut unowned_env: EnvUnowned<'local>,
     _class: JClass<'local>,
     handle: jlong,
     topic_j: JString<'local>,
     data_j: JByteArray<'local>,
 ) {
-    unowned_env
-        .with_env(|env| -> jni::errors::Result<()> {
-            let topic: String = env.get_string(&topic_j)?.into();
-            let data: Vec<u8> = env.convert_byte_array(&data_j)?;
-            ffi_publish(handle as *mut FfiNode, &topic, &data);
-            Ok(())
-        })
-        .resolve::<ThrowRuntimeExAndDefault>()
+    let outcome = unowned_env.with_env(|env| -> Result<(), jni::errors::Error> {
+        let topic: String = topic_j.to_string();
+        let data: Vec<u8> = env.convert_byte_array(&data_j)?;
+        ffi_publish(handle as *mut FfiNode, &topic, &data);
+        Ok(())
+    });
+    outcome.resolve::<ThrowRuntimeExAndDefault>()
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn java_com_example_p2p_p2p_lib_shutdown<'local>(
-    _env: EnvUnowned<'local>,
+pub extern "system" fn Java_com_example_p2p_P2pLib_shutdown<'local>(
+    _unowned_env: EnvUnowned<'local>,
     _class: JClass<'local>,
     handle: jlong,
 ) {
@@ -93,8 +81,8 @@ pub extern "system" fn java_com_example_p2p_p2p_lib_shutdown<'local>(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn java_com_example_p2p_p2p_lib_destroy<'local>(
-    _env: EnvUnowned<'local>,
+pub extern "system" fn Java_com_example_p2p_P2pLib_destroy<'local>(
+    _unowned_env: EnvUnowned<'local>,
     _class: JClass<'local>,
     handle: jlong,
 ) {
