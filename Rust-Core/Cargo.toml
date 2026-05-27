@@ -9,11 +9,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-libp2p = { version = "0.56.0", features = [
+libp2p = { version = "0.56.0", default-features = false, features = [
     "tokio",
     "noise",
     "yamux",
-    "mdns",
     "gossipsub",
     "identify",
     "tcp",
@@ -46,9 +45,13 @@ tokio = { version = "1.49.0", features = [
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.22.4", default-features = false }
 
+[target.'cfg(not(target_os = "android"))'.dependencies]
+libp2p = { version = "0.56.0", features = ["mdns"] }
+if-watch = "3"
+
 [profile.release]
 opt-level = "z"
 lto = true
 codegen-units = 1
-strip = true
 panic = "abort"
+strip = "debuginfo"

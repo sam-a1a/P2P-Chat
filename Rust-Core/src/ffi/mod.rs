@@ -1,6 +1,10 @@
+// Rust-Core/src/ffi/mod.rs
+
+// Only compile android FFI when targeting Android
 #[cfg(target_os = "android")]
 pub mod android;
 
+// Only compile iOS FFI when targeting iOS
 #[cfg(target_os = "ios")]
 pub mod ios;
 
@@ -49,13 +53,17 @@ pub(super) fn ffi_start(key_path: &str, _db_path: &str) -> *mut FfiNode {
 }
 
 pub(super) fn ffi_poll_event(ptr: *mut FfiNode) -> *mut c_char {
-    if ptr.is_null() { return std::ptr::null_mut(); }
+    if ptr.is_null() {
+        return std::ptr::null_mut();
+    }
     let node = unsafe { &mut *ptr };
 
     match node.handle.event_rx.try_recv() {
         Ok(ev) => {
             let json = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
-            CString::new(json).map(CString::into_raw).unwrap_or(std::ptr::null_mut())
+            CString::new(json)
+                .map(CString::into_raw)
+                .unwrap_or(std::ptr::null_mut())
         }
         Err(_) => std::ptr::null_mut(),
     }
@@ -68,19 +76,25 @@ pub(super) fn ffi_free_string(ptr: *mut c_char) {
 }
 
 pub(super) fn ffi_subscribe(ptr: *mut FfiNode, topic: &str) {
-    if ptr.is_null() { return; }
+    if ptr.is_null() {
+        return;
+    }
     let node = unsafe { &*ptr };
     node.handle.subscribe(topic);
 }
 
 pub(super) fn ffi_publish(ptr: *mut FfiNode, topic: &str, data: &[u8]) {
-    if ptr.is_null() { return; }
+    if ptr.is_null() {
+        return;
+    }
     let node = unsafe { &*ptr };
     node.handle.publish(topic, data.to_vec());
 }
 
 pub(super) fn ffi_shutdown(ptr: *mut FfiNode) {
-    if ptr.is_null() { return; }
+    if ptr.is_null() {
+        return;
+    }
     let node = unsafe { &*ptr };
     node.handle.shutdown();
 }

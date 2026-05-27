@@ -1,24 +1,27 @@
 use crate::{
-    behaviour::{ChatBehaviour, ChatBehaviourEvent},
+    behaviour::ChatBehaviour,
     error::{P2pError, Result},
     types::{ChatMessage, NodeCommand, NodeEvent},
 };
 use futures::StreamExt;
 use libp2p::{
-    gossipsub, identify, mdns, noise,
+    gossipsub, identify, noise,
     swarm::SwarmEvent,
     tcp, yamux, Swarm,
 };
+#[cfg(not(target_os = "android"))]
+use libp2p::mdns;
 use std::time::Duration;
 use tokio::sync::{mpsc, watch};
+use crate::behaviour::ChatBehaviourEvent;
 
 const LISTEN_ADDR: &str = "/ip4/0.0.0.0/tcp/0";
 const PROTOCOL_VERSION: &str = "/p2p-chat/1.0.0";
 
 pub struct NodeHandle {
     pub command_tx: mpsc::UnboundedSender<NodeCommand>,
-    pub event_rx:   mpsc::UnboundedReceiver<NodeEvent>,
-    shutdown_tx:    watch::Sender<bool>,
+    pub event_rx: mpsc::UnboundedReceiver<NodeEvent>,
+    shutdown_tx: watch::Sender<bool>,
 }
 
 impl NodeHandle {
@@ -39,8 +42,8 @@ impl NodeHandle {
 }
 
 struct Node {
-    swarm:      Swarm<ChatBehaviour>,
-    event_tx:   mpsc::UnboundedSender<NodeEvent>,
+    swarm: Swarm<ChatBehaviour>,
+    event_tx: mpsc::UnboundedSender<NodeEvent>,
     command_rx: mpsc::UnboundedReceiver<NodeCommand>,
     shutdown_rx: watch::Receiver<bool>,
 }
@@ -92,9 +95,9 @@ impl Node {
     fn subscribe(&mut self, topic_name: &str) {
         let topic = gossipsub::IdentTopic::new(topic_name);
         match self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
-            Ok(true)  => log::info!("subscribed to topic '{topic_name}'"),
+            Ok(true) => log::info!("subscribed to topic '{topic_name}'"),
             Ok(false) => log::debug!("already subscribed to '{topic_name}'"),
-            Err(e)    => log::error!("subscribe error: {e}"),
+            Err(e) => log::error!("subscribe error: {e}"),
         }
     }
 
@@ -102,7 +105,7 @@ impl Node {
         let topic = gossipsub::IdentTopic::new(topic_name);
         match self.swarm.behaviour_mut().gossipsub.publish(topic, data) {
             Ok(msg_id) => log::debug!("published message {msg_id}"),
-            Err(e)     => {
+            Err(e) => {
                 log::error!("publish error: {e}");
                 let _ = self.event_tx.send(NodeEvent::Error {
                     message: format!("publish: {e}"),
@@ -122,7 +125,7 @@ impl Node {
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 log::info!("connected: {peer_id}");
                 let _ = self.event_tx.send(NodeEvent::ConnectionEstablished {
-                    peer:    peer_id.to_string(),
+                    peer: peer_id.to_string(),
                     address: endpoint.get_remote_address().to_string(),
                 });
             }
@@ -139,6 +142,7 @@ impl Node {
 
     fn handle_behaviour_event(&mut self, event: ChatBehaviourEvent) {
         match event {
+            #[cfg(not(target_os = "android"))]
             ChatBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
                 for (peer_id, addr) in peers {
                     log::info!("mDNS discovered {peer_id} @ {addr}");
@@ -151,6 +155,7 @@ impl Node {
                     });
                 }
             }
+            #[cfg(not(target_os = "android"))]
             ChatBehaviourEvent::Mdns(mdns::Event::Expired(peers)) => {
                 for (peer_id, _addr) in peers {
                     log::info!("mDNS expired {peer_id}");
@@ -235,6 +240,7 @@ fn build_swarm(keypair: libp2p::identity::Keypair) -> Result<Swarm<ChatBehaviour
             )
                 .map_err(|e| anyhow::anyhow!("gossipsub: {e}"))?;
 
+            #[cfg(not(target_os = "android"))]
             let mdns = mdns::tokio::Behaviour::new(
                 mdns::Config::default(),
                 key.public().to_peer_id(),
@@ -248,6 +254,7 @@ fn build_swarm(keypair: libp2p::identity::Keypair) -> Result<Swarm<ChatBehaviour
 
             Ok(ChatBehaviour {
                 gossipsub,
+                #[cfg(not(target_os = "android"))]
                 mdns,
                 identify,
             })

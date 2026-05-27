@@ -24,6 +24,14 @@ class P2pNode(context: Context) {
 
     fun start(scope: CoroutineScope) {
         if (handle != 0L) return
+
+        if (!P2pLib.isAvailable) {
+            scope.launch {
+                _events.emit(NodeEvent.Error("Native library not available"))
+            }
+            return
+        }
+
         handle = P2pLib.start(keyPath, dbPath)
         if (handle == 0L) {
             scope.launch {
