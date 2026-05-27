@@ -47,34 +47,34 @@ The browser sends a list of supported elliptic curves; the current Rust implemen
 
 ## How to Run
 
-### Desktop node
+### Desktop Node
 ```bash
 cd Rust-Core
 cargo run
-The node will print its TCP and WebRTC listen addresses.
+```
+The node prints its TCP and WebRTC listen addresses. Use the WebRTC address (including the certhash) for the browser client.
 
-Android app
+### Android App
+```bash
 cd Android-Kotlin
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+- Ensure the desktop IP (`192.168.1.6`) is correct in `Rust-Core/src/ffi/mod.rs`.  
+- Rebuild the native library if the IP changes: `bash build-android.sh`.
 
-Make sure the desktop IP (192.168.1.6) is correct in Rust-Core/src/ffi/mod.rs. Rebuild the native library with bash build-android.sh if the IP changes.
-
-Web app
+### Web App
+```bash
 cd Web-WASM
 wasm-pack build --target web --out-dir ../Web-React/src/wasm
 
 cd ../Web-React
 npm install
 npm run dev
+```
+- Update `DESKTOP_WEBRTC_ADDR` in `src/App.tsx` to the desktop’s WebRTC address (including the certhash).
 
-Update DESKTOP_WEBRTC_ADDR in src/App.tsx to match the desktop's WebRTC address (including the certhash).
-
-Notes
-The repo .gitignore excludes node_modules, dist, and generated .so / .wasm files.
-
-The Android jniLibs directory is ignored; native libraries must be rebuilt with build-android.sh.
-
-Desktop IP is currently hardcoded – change it in Rust-Core/src/ffi/mod.rs (for Android) and Web-React/src/App.tsx (for Web) if your laptop's IP changes.
-
-
+## Notes
+- The `.gitignore` excludes `node_modules/`, `dist/`, and generated `.so` / `.wasm` files.
+- The `Android-Kotlin/app/src/main/jniLibs/` directory is ignored; native libraries must be rebuilt with `build-android.sh`.
+- The desktop IP is currently hardcoded – change it in `Rust-Core/src/ffi/mod.rs` (for Android) and `Web-React/src/App.tsx` (for Web) when the laptop’s IP changes.
