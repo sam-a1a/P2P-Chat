@@ -2,20 +2,9 @@ use crate::error::{P2pError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use vodozemac::{
-    megolm::{
-        GroupSession,
-        InboundGroupSession,
-        MegolmMessage,
-        SessionConfig,
-        SessionKey,
-    },
-    olm::{
-        Account,
-        OlmMessage,
-        Session,
-        SessionConfig as OlmSessionConfig,
-    },
     Curve25519PublicKey,
+    megolm::{GroupSession, InboundGroupSession, MegolmMessage, SessionConfig, SessionKey},
+    olm::{Account, OlmMessage, Session, SessionConfig as OlmSessionConfig},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,9 +90,7 @@ impl CryptoEngine {
     pub fn olm_decrypt(&mut self, their_curve25519: &str, ciphertext: &[u8]) -> Result<Vec<u8>> {
         let msg = vodozemac::olm::PreKeyMessage::from_bytes(ciphertext)
             .map(OlmMessage::PreKey)
-            .or_else(|_| {
-                vodozemac::olm::Message::from_bytes(ciphertext).map(OlmMessage::Normal)
-            })
+            .or_else(|_| vodozemac::olm::Message::from_bytes(ciphertext).map(OlmMessage::Normal))
             .map_err(|e| P2pError::Crypto(e.to_string()))?;
 
         if let OlmMessage::PreKey(ref prekey) = msg {
@@ -179,12 +166,12 @@ impl CryptoEngine {
             .ok_or_else(|| P2pError::Crypto("no inbound Megolm session".into()))?;
 
         // Fix: Use MegolmMessage::from_bytes().
-        let msg = MegolmMessage::from_bytes(ciphertext)
-            .map_err(|e| P2pError::Crypto(e.to_string()))?;
+        let msg =
+            MegolmMessage::from_bytes(ciphertext).map_err(|e| P2pError::Crypto(e.to_string()))?;
 
         inbound
             .decrypt(&msg)
-            .map(|r| r.plaintext.into())
+            .map(|r| r.plaintext)
             .map_err(|e| P2pError::Crypto(e.to_string()))
     }
 }
