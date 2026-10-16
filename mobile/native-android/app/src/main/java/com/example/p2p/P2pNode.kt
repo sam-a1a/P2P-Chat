@@ -23,7 +23,7 @@ class P2pNode(context: Context) {
     private val _events = MutableSharedFlow<NodeEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<NodeEvent> = _events
 
-    fun start(scope: CoroutineScope) = synchronized(nativeLock) {
+    fun start(scope: CoroutineScope): Unit = synchronized(nativeLock) {
         if (handle != 0L) return
 
         if (!P2pLib.isAvailable) {
@@ -43,12 +43,12 @@ class P2pNode(context: Context) {
         startPolling(scope)
     }
 
-    fun subscribe(topic: String) = synchronized(nativeLock) {
+    fun subscribe(topic: String): Unit = synchronized(nativeLock) {
         if (handle == 0L) return
         P2pLib.subscribe(handle, topic)
     }
 
-    fun publish(topic: String, data: ByteArray) = synchronized(nativeLock) {
+    fun publish(topic: String, data: ByteArray): Unit = synchronized(nativeLock) {
         if (handle == 0L) return
         P2pLib.publish(handle, topic, data)
     }
