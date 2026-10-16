@@ -47,6 +47,8 @@ The browser sends a list of supported elliptic curves; the current Rust implemen
 
 ## How to Run
 
+Prerequisites: Rust stable (edition 2024), Node.js 24+, and the WebAssembly target (`rustup target add wasm32-unknown-unknown`). Android also needs JDK 17+, the Android SDK/NDK, and cargo-ndk.
+
 ### Desktop Node
 ```bash
 cd Rust-Core
@@ -65,11 +67,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### Web App
 ```bash
-cd Web-WASM
-wasm-pack build --target web --out-dir ../Web-React/src/wasm
-
-cd ../Web-React
-npm install
+cd Web-React
+npm ci
+npm run build
 npm run dev
 ```
 - Update `DESKTOP_WEBRTC_ADDR` in `src/App.tsx` to the desktop’s WebRTC address (including the certhash).
@@ -78,3 +78,12 @@ npm run dev
 - The `.gitignore` excludes `node_modules/`, `dist/`, and generated `.so` / `.wasm` files.
 - The `Android-Kotlin/app/src/main/jniLibs/` directory is ignored; native libraries must be rebuilt with `build-android.sh`.
 - The desktop IP is currently hardcoded – change it in `Rust-Core/src/ffi/mod.rs` (for Android) and `Web-React/src/App.tsx` (for Web) when the laptop’s IP changes.
+
+### Build checks
+
+```bash
+cargo test --locked -p p2p
+cd Web-React && npm ci && npm run build
+```
+
+`Web-WASM` is intentionally a separate Cargo workspace with its own lockfile, so native dependencies are not compiled for wasm32. `npm run build` generates the WASM bindings before bundling the UI. `npm run build:wasm` refreshes only those bindings. CI runs desktop tests and the production browser build. A successful build does not establish browser/desktop transport compatibility; see issue #2.
