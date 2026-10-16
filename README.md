@@ -55,7 +55,7 @@ Use a distinct identity path and ports for each local node. Type `quit` to stop.
 
 ## Android
 
-Requires JDK 21 (Gradle can provision it), Android SDK 36.1, Android NDK, and Rust Android targets.
+Requires JDK 21 (Gradle can provision it), Android SDK 37.0, Android NDK, and Rust Android targets.
 
 ```bash
 cargo install cargo-ndk --locked

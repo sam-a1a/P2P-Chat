@@ -64,3 +64,8 @@ jobs:
           bash core/build-android.sh aarch64-linux-android
       - run: ./gradlew assembleDebug lintDebug
         working-directory: mobile/native-android
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: android-debug-arm64
+          path: mobile/native-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
