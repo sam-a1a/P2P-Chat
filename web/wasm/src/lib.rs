@@ -1,217 +1,99 @@
 #![cfg(target_arch = "wasm32")]
-
-use futures::channel::mpsc;
-use futures::StreamExt;
-use libp2p::{
-    gossipsub, identify,
-    swarm::SwarmEvent,
-    Multiaddr, Swarm,
-};
-use libp2p_webrtc_websys as webrtc_websys;
+use futures::{channel::mpsc, StreamExt};
+use libp2p::{gossipsub, identify, noise, yamux, swarm::SwarmEvent, Multiaddr, Swarm, Transport};
+use serde::Serialize;
+use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use std::cell::RefCell;
-use std::rc::Rc;
 
-thread_local! {
-    static NODE: RefCell<Option<NodeState>> = RefCell::new(None);
-}
-
-struct NodeState {
-    cmd_tx: mpsc::UnboundedSender<Command>,
-    ev_rx: mpsc::UnboundedReceiver<Event>,
-}
-
-enum Command {
-    Subscribe(String),
-    Publish { topic: String, data: Vec<u8> },
-    Shutdown,
-}
-
+thread_local! { static NODE: RefCell<Option<NodeState>> = const { RefCell::new(None) }; }
+struct NodeState { commands: mpsc::UnboundedSender<Command>, events: mpsc::UnboundedReceiver<Event> }
+enum Command { Publish(String, String), Shutdown }
+#[derive(Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 enum Event {
-    Message { topic: String, from: String, text: String },
-    Connected(String),
-    Disconnected(String),
+    Message { from: String, text: String },
+    Connected { peer: String },
+    Disconnected { peer: String },
+    Published { id: String, text: String },
+    Error { message: String },
 }
+fn js_error(error: impl std::fmt::Display) -> JsValue { JsValue::from_str(&error.to_string()) }
 
 #[wasm_bindgen]
-pub async fn start_node(desktop_webrtc_addr: String) -> Result<(), JsValue> {
-    console_log::init_with_level(log::Level::Info)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-    let (cmd_tx, cmd_rx) = mpsc::unbounded();
-    let (ev_tx, ev_rx) = mpsc::unbounded();
-
-    NODE.with(|cell| {
-        *cell.borrow_mut() = Some(NodeState { cmd_tx: cmd_tx.clone(), ev_rx });
-    });
-
-    spawn_local(run_swarm(desktop_webrtc_addr, cmd_rx, ev_tx));
-    Ok(())
-}
-
-#[wasm_bindgen]
-pub fn subscribe(topic: String) {
-    NODE.with(|cell| {
-        if let Some(ref state) = *cell.borrow() {
-            let _ = state.cmd_tx.unbounded_send(Command::Subscribe(topic));
-        }
-    });
-}
-
-#[wasm_bindgen]
-pub fn send_message(topic: String, text: String) {
-    NODE.with(|cell| {
-        if let Some(ref state) = *cell.borrow() {
-            let _ = state.cmd_tx.unbounded_send(Command::Publish {
-                topic,
-                data: text.into_bytes(),
-            });
-        }
-    });
-}
-
-#[wasm_bindgen]
-pub fn poll_event() -> Option<String> {
-    NODE.with(|cell| {
-        if let Some(ref mut state) = *cell.borrow_mut() {
-            match state.ev_rx.try_next() {
-                Ok(Some(ev)) => {
-                    let json = match ev {
-                        Event::Message { topic, from, text } => {
-                            serde_json::json!({
-                                "type": "message",
-                                "topic": topic,
-                                "from": from,
-                                "text": text,
-                            })
-                            .to_string()
-                        }
-                        Event::Connected(peer) => {
-                            serde_json::json!({
-                                "type": "connected",
-                                "peer": peer,
-                            })
-                            .to_string()
-                        }
-                        Event::Disconnected(peer) => {
-                            serde_json::json!({
-                                "type": "disconnected",
-                                "peer": peer,
-                            })
-                            .to_string()
-                        }
-                    };
-                    Some(json)
-                }
-                _ => None,
-            }
-        } else {
-            None
-        }
-    })
-}
-
-#[wasm_bindgen]
-pub fn shutdown() {
-    NODE.with(|cell| {
-        if let Some(ref state) = *cell.borrow() {
-            let _ = state.cmd_tx.unbounded_send(Command::Shutdown);
-        }
-        *cell.borrow_mut() = None;
-    });
-}
-
-async fn run_swarm(
-    desktop_addr: String,
-    mut cmd_rx: mpsc::UnboundedReceiver<Command>,
-    ev_tx: mpsc::UnboundedSender<Event>,
-) {
-    let mut swarm: Swarm<Behaviour> = libp2p::SwarmBuilder::with_new_identity()
+pub fn start_node(address: String) -> Result<(), JsValue> {
+    let _ = console_log::init_with_level(log::Level::Info);
+    if NODE.with(|node| node.borrow().is_some()) { return Err(js_error("Node already running")); }
+    let address: Multiaddr = address.parse().map_err(js_error)?;
+    let mut swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_wasm_bindgen()
         .with_other_transport(|key| {
-            Ok(webrtc_websys::Transport::new(webrtc_websys::Config::new(&key)))
-        })
-        .expect("transport")
+            Ok(libp2p::websocket_websys::Transport::default()
+                .upgrade(libp2p::core::upgrade::Version::V1Lazy)
+                .authenticate(noise::Config::new(key)?)
+                .multiplex(yamux::Config::default()))
+        }).map_err(|e| js_error(e))?
         .with_behaviour(|key| {
-            let gossipsub = gossipsub::Behaviour::new(
-                gossipsub::MessageAuthenticity::Signed(key.clone()),
-                gossipsub::ConfigBuilder::default()
-                    .build()
-                    .expect("gossipsub config"),
-            )
-            .expect("gossipsub init");
-
-            let identify = identify::Behaviour::new(identify::Config::new(
-                "/p2p-chat/1.0.0".to_string(),
-                key.public(),
-            ));
-
-            Ok(Behaviour { gossipsub, identify })
-        })
-        .expect("behaviour")
-        .with_swarm_config(|c| {
-            c.with_idle_connection_timeout(std::time::Duration::from_secs(60))
-        })
+            let config = gossipsub::ConfigBuilder::default()
+                .heartbeat_interval(std::time::Duration::from_secs(1)).build()
+                .map_err(|e| Box::<dyn std::error::Error + Send + Sync>::from(e))?;
+            let mut gossipsub = gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(key.clone()), config)?;
+            gossipsub.subscribe(&gossipsub::IdentTopic::new("chat"))?;
+            Ok(Behaviour { gossipsub, identify: identify::Behaviour::new(identify::Config::new("/p2p-chat/1.0.0".into(), key.public())) })
+        }).map_err(js_error)?
+        .with_swarm_config(|c| c.with_idle_connection_timeout(std::time::Duration::from_secs(300)))
         .build();
-
-    let addr: Multiaddr = desktop_addr.parse().expect("invalid multiaddr");
-    log::info!("Dialing {addr}");
-    if let Err(e) = swarm.dial(addr) {
-        log::error!("dial error: {e}");
-        let _ = ev_tx.unbounded_send(Event::Disconnected("dial failed".into()));
-        return;
-    }
-
+    swarm.dial(address).map_err(js_error)?;
+    let (commands, rx) = mpsc::unbounded();
+    let (tx, events) = mpsc::unbounded();
+    NODE.with(|node| *node.borrow_mut() = Some(NodeState { commands, events }));
+    spawn_local(run(swarm, rx, tx));
+    Ok(())
+}
+#[wasm_bindgen]
+pub fn send_message(id: String, text: String) -> Result<(), JsValue> {
+    if text.trim().is_empty() || text.len() > 65536 { return Err(js_error("Message must contain 1–65536 UTF-8 bytes")); }
+    NODE.with(|node| node.borrow().as_ref().ok_or_else(|| js_error("Not connected"))?
+        .commands.unbounded_send(Command::Publish(id, text)).map_err(js_error))
+}
+#[wasm_bindgen]
+pub fn poll_event() -> Option<String> {
+    NODE.with(|node| node.borrow_mut().as_mut()?.events.try_recv().ok().and_then(|e| serde_json::to_string(&e).ok()))
+}
+#[wasm_bindgen]
+pub fn shutdown() {
+    NODE.with(|node| { if let Some(state) = node.borrow_mut().take() { let _ = state.commands.unbounded_send(Command::Shutdown); } });
+}
+async fn run(mut swarm: Swarm<Behaviour>, mut commands: mpsc::UnboundedReceiver<Command>, events: mpsc::UnboundedSender<Event>) {
     loop {
         futures::select! {
-            cmd = cmd_rx.next() => {
-                match cmd {
-                    Some(Command::Subscribe(topic)) => {
-                        let t = gossipsub::IdentTopic::new(&topic);
-                        if let Err(e) = swarm.behaviour_mut().gossipsub.subscribe(&t) {
-                            log::error!("subscribe error: {e}");
-                        }
-                    }
-                    Some(Command::Publish { topic, data }) => {
-                        let t = gossipsub::IdentTopic::new(&topic);
-                        if let Err(e) = swarm.behaviour_mut().gossipsub.publish(t, data) {
-                            log::error!("publish error: {e}");
-                        }
-                    }
-                    Some(Command::Shutdown) | None => break,
+            command = commands.next() => match command {
+                Some(Command::Publish(id, text)) => {
+                    let event = match swarm.behaviour_mut().gossipsub.publish(gossipsub::IdentTopic::new("chat"), text.as_bytes()) {
+                        Ok(_) => Event::Published { id, text },
+                        Err(e) => Event::Error { message: format!("Message not sent: {e}") },
+                    };
+                    let _ = events.unbounded_send(event);
                 }
-            }
+                Some(Command::Shutdown) | None => break,
+            },
             event = swarm.select_next_some() => {
-                match event {
+                let event = match event {
                     SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                        log::info!("connected: {peer_id}");
-                        let _ = ev_tx.unbounded_send(Event::Connected(peer_id.to_string()));
+                        swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                        Some(Event::Connected { peer: peer_id.to_string() })
                     }
-                    SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                        log::info!("disconnected: {peer_id}");
-                        let _ = ev_tx.unbounded_send(Event::Disconnected(peer_id.to_string()));
-                    }
-                    SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(
-                        gossipsub::Event::Message { message, propagation_source, .. }
-                    )) => {
-                        let _ = ev_tx.unbounded_send(Event::Message {
-                            topic: message.topic.to_string(),
-                            from: propagation_source.to_string(),
-                            text: String::from_utf8_lossy(&message.data).to_string(),
-                        });
-                    }
-                    _ => {}
-                }
+                    SwarmEvent::ConnectionClosed { peer_id, num_established: 0, .. } => Some(Event::Disconnected { peer: peer_id.to_string() }),
+                    SwarmEvent::OutgoingConnectionError { error, .. } => Some(Event::Error { message: format!("Connection failed: {error}") }),
+                    SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message { message, propagation_source, .. })) => Some(Event::Message {
+                        from: message.source.unwrap_or(propagation_source).to_string(), text: String::from_utf8_lossy(&message.data).into_owned(),
+                    }),
+                    _ => None,
+                };
+                if let Some(event) = event { let _ = events.unbounded_send(event); }
             }
         }
     }
 }
-
-use libp2p::swarm::NetworkBehaviour;
-
-#[derive(NetworkBehaviour)]
-struct Behaviour {
-    gossipsub: gossipsub::Behaviour,
-    identify: identify::Behaviour,
-}
+#[derive(libp2p::swarm::NetworkBehaviour)]
+struct Behaviour { gossipsub: gossipsub::Behaviour, identify: identify::Behaviour }

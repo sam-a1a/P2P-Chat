@@ -1,123 +1,41 @@
-import { useEffect, useState, useRef } from 'react';
-
-// Dynamic import holder – will contain all WASM exports after init
-let wasmModule: any = null;
-
-const DESKTOP_WEBRTC_ADDR =
-    '/ip4/192.168.1.6/udp/9090/webrtc-direct/certhash/uEiDyoeV-gNjvXu6HusX7VBd1SX-9eMyEWH3Rm1SfHEvcoQ';
-
-type Message = {
-  type: 'message' | 'connected' | 'disconnected';
-  from?: string;
-  text?: string;
-  peer?: string;
-};
-
-function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [ready, setReady] = useState(false);
-  const intervalRef = useRef<number | null>(null);
-
+import { useEffect, useRef, useState } from 'react';
+import { ChatClient, describe, saveAddress, savedAddress, type ChatEvent, type Status } from '../../shared/client';
+import '../../shared/chat.css';
+export default function App() {
+  const [address, setAddress] = useState(savedAddress);
+  const [status, setStatus] = useState<Status>('disconnected');
+  const [events, setEvents] = useState<ChatEvent[]>([]);
+  const [text, setText] = useState('');
+  const client = useRef<ChatClient | null>(null);
+  const log = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    async function start() {
-      try {
-        // 1. Import the WASM module (gives us the default init + all named exports)
-        wasmModule = await import('./wasm/web_wasm.js');
-
-        // 2. Initialize the WASM (call the default export)
-        await wasmModule.default(); // this is the equivalent of init()
-
-        // 3. Now all functions are available
-        await wasmModule.start_node(DESKTOP_WEBRTC_ADDR);
-        wasmModule.subscribe('chat');
-        setReady(true);
-      } catch (e) {
-        console.error('WASM start failed:', e);
-      }
-    }
-
-    start();
-
-    // Polling
-    intervalRef.current = window.setInterval(() => {
-      if (!wasmModule || !wasmModule.poll_event) return;
-      const json = wasmModule.poll_event();
-      if (json) {
-        const msg: Message = JSON.parse(json);
-        setMessages((prev) => [...prev, msg]);
-      }
-    }, 100);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      // Safe shutdown
-      if (wasmModule && typeof wasmModule.shutdown === 'function') {
-        wasmModule.shutdown();
-      }
-    };
+    const node = new ChatClient(e => setEvents(old => [...old.slice(-499), e]), setStatus);
+    client.current = node;
+    return () => { node.disconnect(); client.current = null; };
   }, []);
-
-  const handleSend = () => {
-    if (input.trim() && wasmModule) {
-      wasmModule.send_message('chat', input.trim());
-      setMessages((prev) => [
-        ...prev,
-        { type: 'message', text: input, from: 'me' },
-      ]);
-      setInput('');
-    }
-  };
-
-  return (
-      <div className="min-h-screen bg-gray-900 text-white flex flex-col p-4 max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-4">P2P Chat</h1>
-        <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-          {messages.map((msg, i) => (
-              <div
-                  key={i}
-                  className={`p-2 rounded-lg ${
-                      msg.type === 'connected' || msg.type === 'disconnected'
-                          ? 'bg-green-800 text-center text-sm'
-                          : msg.from === 'me'
-                              ? 'bg-blue-600 self-end text-right'
-                              : 'bg-gray-700'
-                  }`}
-              >
-                {msg.type === 'connected' && (
-                    <span>🟢 {msg.peer} connected</span>
-                )}
-                {msg.type === 'disconnected' && (
-                    <span>🔴 {msg.peer} disconnected</span>
-                )}
-                {msg.type === 'message' && (
-                    <>
-                      <p className="text-xs opacity-70">{msg.from}</p>
-                      <p>{msg.text}</p>
-                    </>
-                )}
-              </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-              className="flex-1 p-2 rounded bg-gray-800 border border-gray-600 text-white"
-              placeholder="Type a message..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              disabled={!ready}
-          />
-          <button
-              className="px-4 py-2 bg-blue-500 rounded disabled:opacity-50"
-              onClick={handleSend}
-              disabled={!ready}
-          >
-            Send
-          </button>
-        </div>
-      </div>
-  );
+  useEffect(() => { log.current?.scrollTo(0, log.current.scrollHeight); }, [events]);
+  function send(e: React.FormEvent) {
+    e.preventDefault();
+    try { client.current?.send(text); setText(''); }
+    catch (error) { setEvents(old => [...old, { type: 'error', message: String(error) }]); }
+  }
+  return <main>
+    <h1>P2P Chat · React</h1><p>Connect to a desktop peer and chat on the shared LAN channel.</p>
+    <label htmlFor="address">Peer address</label>
+    <form className="row" onSubmit={e => { e.preventDefault(); saveAddress(address); void client.current?.connect(address); }}>
+      <input id="address" value={address} onChange={e => setAddress(e.target.value)} disabled={status !== 'disconnected'} required />
+      <button disabled={status !== 'disconnected'}>Connect</button>
+      <button type="button" onClick={() => client.current?.disconnect()} disabled={status === 'disconnected'}>Disconnect</button>
+    </form>
+    <div className="status" role="status">Status: {status}</div>
+    <div className="log" role="log" aria-label="Messages" ref={log}>
+      {!events.length && <p>No messages yet.</p>}
+      {events.map((event, i) => <div key={i} className={`entry ${event.type === 'error' ? 'error' : ''}`}>{describe(event)}</div>)}
+    </div>
+    <form className="row" onSubmit={send}>
+      <input aria-label="Message" placeholder="Type a message…" value={text} onChange={e => setText(e.target.value)} disabled={status !== 'connected'} maxLength={16000} />
+      <button disabled={status !== 'connected' || !text.trim()}>Send</button>
+    </form>
+    <small>“You” appears after the local peer accepts publication; it is not a delivery receipt. Messages are visible to peers on this channel and are not saved after reload.</small>
+  </main>;
 }
-
-export default App;

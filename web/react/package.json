@@ -3,20 +3,21 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
-    "vite-plugin-wasm": "^3.6.0",
-    "wasm-pack": "0.15.0"
+    "wasm-pack": "0.15.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4"
   },
   "scripts": {
     "dev": "vite",
-    "build:wasm": "cd ../wasm && wasm-pack build --locked --target web --out-dir ../react/src/wasm",
-    "build": "npm run build:wasm && vite build",
+    "build:wasm": "cd ../wasm && wasm-pack build --locked --target web --out-dir pkg",
+    "build": "npm run build:wasm && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.3.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "tailwindcss": "^4.3.0"
+    "react-dom": "^19.2.6"
   },
-  "private": true
+  "private": true,
+  "name": "@p2p-chat/react",
+  "type": "module"
 }
