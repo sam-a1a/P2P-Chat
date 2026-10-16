@@ -5,6 +5,7 @@ plugins {
 
 android {
     namespace = "com.example.p2p"
+    ndkVersion = "29.0.13846066"
     compileSdk {
         version = release(37) {
             minorApiLevel = 0
