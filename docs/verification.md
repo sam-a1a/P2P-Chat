@@ -8,11 +8,11 @@ Verified on 2026-10-16 after the dependency upgrades. Scope: foreground, shared-
 - `cargo fmt --all -- --check` and warning-free Clippy pass. CI enforces both.
 - React and Solid production builds and TypeScript checks pass.
 - Three Chromium/Playwright scenarios pass: each browser client exchanges messages with a real desktop peer, rejects invalid/unreachable addresses, disconnects and reconnects; React and Solid exchange messages through the desktop. Readiness uses subscription events, not handshake sleeps.
-- [CI run 38899934817](https://github.com/sam-a1a/P2P-Chat/actions/runs/38899934817) passed on commit `6c9ccb0`: Linux/macOS Rust tests, browser builds/E2E, Android arm64 native build, APK assembly and Android lint. Subsequent commits add C-ABI guards, formatting/Clippy enforcement, and Kotlin return-type cleanup; see the PR checks for their final status.
+- [Final CI run 38901256832](https://github.com/sam-a1a/P2P-Chat/actions/runs/38901256832) passed on commit `e8c13c4`: Linux/macOS native tests, formatting and Clippy, browser builds/E2E, Android arm64 native build, APK assembly, and Android lint. This implementation was merged into `main` as `9c251ed` in [PR #8](https://github.com/sam-a1a/P2P-Chat/pull/8).
 
 ## Android runtime evidence
 
-The arm64 debug APK from that CI run was installed and launched on both an Android 36 arm64 emulator and a physical Samsung SM-S721B phone.
+The arm64 debug APK from [run 38899934817](https://github.com/sam-a1a/P2P-Chat/actions/runs/38899934817), commit `6c9ccb0` was installed and launched on both an Android 36 arm64 emulator and a physical Samsung SM-S721B phone.
 
 - Emulator explicitly connected to the Mac desktop via `/ip4/10.0.2.2/tcp/53493`.
 - The phone discovered the desktop through mDNS on their shared LAN.
