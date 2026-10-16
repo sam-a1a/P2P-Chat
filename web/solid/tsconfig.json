@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ESNext","module":"ESNext","moduleResolution":"bundler","lib":["ESNext","DOM"],"jsx":"preserve","jsxImportSource":"@solidjs/web","strict":true,"skipLibCheck":true,"noEmit":true},"include":["src"]}
