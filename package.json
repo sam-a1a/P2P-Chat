@@ -1,0 +1,10 @@
+{
+  "name": "p2p-chat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:web": "npm --prefix web/react run build && npm --prefix web/solid run build",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": { "@playwright/test": "^1.58.0" }
+}
