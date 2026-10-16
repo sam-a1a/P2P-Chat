@@ -47,6 +47,7 @@ pub enum NodeEvent {
         peer: String,
     },
     MessageReceived(ChatMessage),
+    MessagePublished { text: String },
     ListeningOn {
         address: String,
     },

@@ -7,14 +7,25 @@ use futures::StreamExt;
 use libp2p::{
     gossipsub, identify, noise,
     swarm::SwarmEvent,
-    tcp, yamux, Swarm,
+    tcp, yamux, Swarm, Transport,
 };
 use libp2p::mdns;
 use std::time::Duration;
 use tokio::sync::{mpsc, watch};
 use crate::behaviour::ChatBehaviourEvent;
 
-const LISTEN_ADDR: &str = "/ip4/0.0.0.0/tcp/53493";
+pub struct NodeConfig {
+    pub tcp_address: String,
+    pub websocket_address: Option<String>,
+}
+impl Default for NodeConfig {
+    fn default() -> Self {
+        Self {
+            tcp_address: "/ip4/0.0.0.0/tcp/53493".into(),
+            websocket_address: Some("/ip4/0.0.0.0/tcp/9090/ws".into()),
+        }
+    }
+}
 const PROTOCOL_VERSION: &str = "/p2p-chat/1.0.0";
 
 pub struct NodeHandle {
@@ -49,18 +60,21 @@ struct Node {
     event_tx: mpsc::UnboundedSender<NodeEvent>,
     command_rx: mpsc::UnboundedReceiver<NodeCommand>,
     shutdown_rx: watch::Receiver<bool>,
+    config: NodeConfig,
 }
 
 impl Node {
     pub async fn run(mut self) {
-        if let Err(e) = self
-            .swarm
-            .listen_on(LISTEN_ADDR.parse().expect("static multiaddr"))
-        {
-            let _ = self.event_tx.send(NodeEvent::Error {
-                message: format!("listen failed: {e}"),
-            });
-            return;
+        let addresses = std::iter::once(self.config.tcp_address.clone())
+            .chain(self.config.websocket_address.clone());
+        for address in addresses {
+            let result = address.parse::<libp2p::Multiaddr>()
+                .map_err(|e| e.to_string())
+                .and_then(|a| self.swarm.listen_on(a).map_err(|e| e.to_string()));
+            if let Err(e) = result {
+                self.error(format!("listen failed: {e}"));
+                return;
+            }
         }
 
         loop {
@@ -98,15 +112,19 @@ impl Node {
         log::info!("node: event loop exited");
     }
 
+    fn error(&self, message: String) {
+        let _ = self.event_tx.send(NodeEvent::Error { message });
+    }
+
     fn dial_peer(&mut self, addr_str: &str) {
         match addr_str.parse::<libp2p::Multiaddr>() {
             Ok(ma) => {
                 log::info!("dialing {}", addr_str);
                 if let Err(e) = self.swarm.dial(ma) {
-                    log::error!("dial error: {e}");
+                    self.error(format!("dial: {e}"));
                 }
             }
-            Err(e) => log::error!("invalid multiaddr '{}': {e}", addr_str),
+            Err(e) => self.error(format!("invalid address: {e}")),
         }
     }
 
@@ -120,9 +138,14 @@ impl Node {
     }
 
     fn publish(&mut self, topic_name: &str, data: Vec<u8>) {
+        if data.is_empty() || data.len() > 65536 {
+            self.error("Message must contain 1–65536 bytes".into());
+            return;
+        }
+        let text = String::from_utf8_lossy(&data).into_owned();
         let topic = gossipsub::IdentTopic::new(topic_name);
         match self.swarm.behaviour_mut().gossipsub.publish(topic, data) {
-            Ok(msg_id) => log::debug!("published message {msg_id}"),
+            Ok(_) => { let _ = self.event_tx.send(NodeEvent::MessagePublished { text }); },
             Err(e) => {
                 log::error!("publish error: {e}");
                 let _ = self.event_tx.send(NodeEvent::Error {
@@ -147,12 +170,14 @@ impl Node {
                     address: endpoint.get_remote_address().to_string(),
                 });
             }
-            SwarmEvent::ConnectionClosed { peer_id, .. } => {
+            SwarmEvent::ConnectionClosed { peer_id, num_established: 0, .. } => {
                 log::info!("disconnected: {peer_id}");
                 let _ = self.event_tx.send(NodeEvent::ConnectionClosed {
                     peer: peer_id.to_string(),
                 });
             }
+            SwarmEvent::OutgoingConnectionError { error, .. } => self.error(format!("connection: {error}")),
+            SwarmEvent::ListenerError { error, .. } => self.error(format!("listener: {error}")),
             SwarmEvent::Behaviour(bev) => self.handle_behaviour_event(bev),
             _ => {}
         }
@@ -163,10 +188,11 @@ impl Node {
             ChatBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
                 for (peer_id, addr) in peers {
                     log::info!("mDNS discovered {peer_id} @ {addr}");
-                    self.swarm
-                        .behaviour_mut()
-                        .gossipsub
-                        .add_explicit_peer(&peer_id);
+                    self.swarm.add_peer_address(peer_id, addr.clone());
+                    if !self.swarm.is_connected(&peer_id) {
+                        let _ = self.swarm.dial(addr);
+                    }
+                    self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                     let _ = self.event_tx.send(NodeEvent::PeerDiscovered {
                         peer: peer_id.to_string(),
                     });
@@ -190,7 +216,7 @@ impl Node {
                                               ..
                                           }) => {
                 let msg = ChatMessage::new(
-                    &propagation_source.to_string(),
+                    &message.source.unwrap_or(propagation_source).to_string(),
                     message.topic.as_str(),
                     message.data,
                 );
@@ -212,6 +238,10 @@ impl Node {
 }
 
 pub fn start_node(keypair: libp2p::identity::Keypair) -> Result<NodeHandle> {
+    start_node_with_config(keypair, NodeConfig::default())
+}
+
+pub fn start_node_with_config(keypair: libp2p::identity::Keypair, config: NodeConfig) -> Result<NodeHandle> {
     let swarm = build_swarm(keypair)?;
 
     let (event_tx, event_rx) = mpsc::unbounded_channel();
@@ -223,6 +253,7 @@ pub fn start_node(keypair: libp2p::identity::Keypair) -> Result<NodeHandle> {
         event_tx,
         command_rx,
         shutdown_rx,
+        config,
     };
 
     tokio::spawn(node.run());
@@ -243,9 +274,16 @@ fn build_swarm(keypair: libp2p::identity::Keypair) -> Result<Swarm<ChatBehaviour
             yamux::Config::default,
         )
         .map_err(|e| P2pError::Transport(e.to_string()))?
+        .with_other_transport(|key| {
+            Ok(libp2p::websocket::Config::new(tcp::tokio::Transport::new(tcp::Config::default()))
+                .upgrade(libp2p::core::upgrade::Version::V1Lazy)
+                .authenticate(noise::Config::new(key)?)
+                .multiplex(yamux::Config::default()))
+        })
+        .map_err(|e| P2pError::Transport(e.to_string()))?
         .with_behaviour(|key| {
             let gossipsub_cfg = gossipsub::ConfigBuilder::default()
-                .heartbeat_interval(Duration::from_secs(10))
+                .heartbeat_interval(Duration::from_secs(1))
                 .validation_mode(gossipsub::ValidationMode::Strict)
                 .build()
                 .map_err(|e| anyhow::anyhow!("gossipsub config: {e}"))?;
