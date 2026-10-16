@@ -12,6 +12,8 @@ object P2pLib {
 
     external fun start(keyPath: String, dbPath: String): Long
     external fun pollEvent(handle: Long): String?
+    external fun dial(handle: Long, address: String)
+
     external fun subscribe(handle: Long, topic: String)
     external fun publish(handle: Long, topic: String, data: ByteArray)
     external fun shutdown(handle: Long)

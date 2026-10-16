@@ -1,5 +1,5 @@
 use super::{FfiNode, ffi_destroy, ffi_free_string, ffi_poll_event,
-            ffi_publish, ffi_shutdown, ffi_start, ffi_subscribe};
+            ffi_dial, ffi_publish, ffi_shutdown, ffi_start, ffi_subscribe};
 use jni::objects::{JClass, JString, JByteArray};
 use jni::sys::{jlong, jstring};
 use jni::EnvUnowned;
@@ -13,8 +13,8 @@ pub extern "system" fn Java_com_example_p2p_P2pLib_start<'local>(
     db_path_j: JString<'local>,
 ) -> jlong {
     let outcome = unowned_env.with_env(|env| -> Result<jlong, jni::errors::Error> {
-        let key_path: String = key_path_j.to_string();
-        let db_path: String = db_path_j.to_string();
+        let key_path: String = key_path_j.try_to_string(env)?;
+        let db_path: String = db_path_j.try_to_string(env)?;
         Ok(ffi_start(&key_path, &db_path) as jlong)
     });
     outcome.resolve::<ThrowRuntimeExAndDefault>()
@@ -47,7 +47,7 @@ pub extern "system" fn Java_com_example_p2p_P2pLib_subscribe<'local>(
     topic_j: JString<'local>,
 ) {
     let outcome = unowned_env.with_env(|env| -> Result<(), jni::errors::Error> {
-        let topic: String = topic_j.to_string();
+        let topic: String = topic_j.try_to_string(env)?;
         ffi_subscribe(handle as *mut FfiNode, &topic);
         Ok(())
     });
@@ -63,7 +63,7 @@ pub extern "system" fn Java_com_example_p2p_P2pLib_publish<'local>(
     data_j: JByteArray<'local>,
 ) {
     let outcome = unowned_env.with_env(|env| -> Result<(), jni::errors::Error> {
-        let topic: String = topic_j.to_string();
+        let topic: String = topic_j.try_to_string(env)?;
         let data: Vec<u8> = env.convert_byte_array(&data_j)?;
         ffi_publish(handle as *mut FfiNode, &topic, &data);
         Ok(())
@@ -87,4 +87,14 @@ pub extern "system" fn Java_com_example_p2p_P2pLib_destroy<'local>(
     handle: jlong,
 ) {
     ffi_destroy(handle as *mut FfiNode);
+}
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_example_p2p_P2pLib_dial<'local>(
+    mut unowned_env: EnvUnowned<'local>, _class: JClass<'local>, handle: jlong, address: JString<'local>,
+) {
+    let outcome = unowned_env.with_env(|env| -> Result<(), jni::errors::Error> {
+        ffi_dial(handle as *mut FfiNode, &address.try_to_string(env)?);
+        Ok(())
+    });
+    outcome.resolve::<ThrowRuntimeExAndDefault>()
 }

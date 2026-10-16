@@ -1,18 +1,10 @@
-#!/bin/bash
-set -e
-
-ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/$(ls $HOME/Library/Android/sdk/ndk | tail -1)}"
-OUTPUT_DIR="../mobile/native-android/app/src/main/jniLibs"
-
-echo "Using NDK: $ANDROID_NDK_HOME"
-echo "Output: $OUTPUT_DIR"
-
-mkdir -p "$OUTPUT_DIR"
-
-cargo ndk \
-  --target aarch64-linux-android \
-  --target armv7-linux-androideabi \
-  --target x86_64-linux-android \
-  --platform 33 \
-  --output-dir "$OUTPUT_DIR" \
-  build --release
+#!/usr/bin/env bash
+set -euo pipefail
+CORE_DIR="$(cd "$(dirname "$0")" && pwd)"
+: "${ANDROID_NDK_HOME:?Set ANDROID_NDK_HOME to an installed Android NDK}"
+command -v cargo-ndk >/dev/null || { echo 'Install cargo-ndk: cargo install cargo-ndk --locked'; exit 1; }
+cd "$CORE_DIR"
+if [ "$#" -eq 0 ]; then set -- aarch64-linux-android armv7-linux-androideabi x86_64-linux-android; fi
+args=()
+for target in "$@"; do rustup target add "$target"; args+=(--target "$target"); done
+cargo ndk "${args[@]}" --platform 33 --output-dir ../mobile/native-android/app/src/main/jniLibs build --release --locked -p p2p --lib

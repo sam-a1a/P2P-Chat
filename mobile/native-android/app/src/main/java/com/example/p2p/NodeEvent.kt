@@ -14,6 +14,7 @@ sealed class NodeEvent {
         val ciphertext: ByteArray,
         val timestampSecs: Long
     ) : NodeEvent()
+    data class MessagePublished(val text: String) : NodeEvent()
     data class ListeningOn(val address: String) : NodeEvent()
     data class Error(val message: String) : NodeEvent()
     object Unknown : NodeEvent()
@@ -48,6 +49,8 @@ sealed class NodeEvent {
                         timestampSecs = inner.getLong("timestamp_secs")
                     )
                 }
+
+                obj.has("MessagePublished") -> MessagePublished(obj.getJSONObject("MessagePublished").getString("text"))
 
                 obj.has("ListeningOn") ->
                     ListeningOn(obj.getJSONObject("ListeningOn").getString("address"))

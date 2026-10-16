@@ -53,12 +53,6 @@ pub(super) fn ffi_start(key_path: &str, _db_path: &str) -> *mut FfiNode {
         }
     };
 
-    #[cfg(target_os = "android")]
-    {
-        // desktop listens on port 53493 (fixed in node.rs)
-        let desktop_addr = "/ip4/192.168.1.6/tcp/53493";
-        handle.dial(desktop_addr);
-    }
 
     Box::into_raw(Box::new(FfiNode { handle }))
 }
@@ -114,4 +108,7 @@ pub(super) fn ffi_destroy(ptr: *mut FfiNode) {
     if !ptr.is_null() {
         unsafe { drop(Box::from_raw(ptr)) };
     }
+}
+pub(super) fn ffi_dial(ptr: *mut FfiNode, address: &str) {
+    if !ptr.is_null() { unsafe { &*ptr }.handle.dial(address); }
 }
