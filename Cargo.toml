@@ -1,6 +1,7 @@
 [workspace]
-members = ["Rust-Core"]
-exclude = ["Web-WASM"]
+members = ["core", "desktop/cli"]
+default-members = ["desktop/cli"]
+exclude = ["web/wasm"]
 resolver = "2"
 
 [profile.release]

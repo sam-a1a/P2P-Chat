@@ -2,7 +2,7 @@
 set -e
 
 ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/$(ls $HOME/Library/Android/sdk/ndk | tail -1)}"
-OUTPUT_DIR="../Android-Kotlin/app/src/main/jniLibs"
+OUTPUT_DIR="../mobile/native-android/app/src/main/jniLibs"
 
 echo "Using NDK: $ANDROID_NDK_HOME"
 echo "Output: $OUTPUT_DIR"

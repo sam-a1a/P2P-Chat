@@ -23,11 +23,11 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: Web-React/package-lock.json
+          cache-dependency-path: web/react/package-lock.json
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: Web-WASM
+          workspaces: web/wasm
       - run: npm ci
-        working-directory: Web-React
+        working-directory: web/react
       - run: npm run build
-        working-directory: Web-React
+        working-directory: web/react

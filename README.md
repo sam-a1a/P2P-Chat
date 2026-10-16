@@ -6,10 +6,10 @@ Multi-platform P2P chat app using libp2p and Rust.
 
 | Module | Description |
 |--------|-------------|
-| `Rust-Core` | Shared Rust library + desktop chat node (TCP + WebRTC) |
-| `Android-Kotlin` | Android chat app (connects via TCP direct dial) |
-| `Web-React` | Browser chat UI (React + Tailwind CSS) |
-| `Web-WASM` | Browser libp2p peer compiled to WebAssembly |
+| `core` | Shared Rust library + desktop chat node (TCP + WebRTC) |
+| `mobile/native-android` | Android chat app (connects via TCP direct dial) |
+| `web/react` | Browser chat UI (React + Tailwind CSS) |
+| `web/wasm` | Browser libp2p peer compiled to WebAssembly |
 
 ## What Works
 
@@ -19,13 +19,13 @@ Multi-platform P2P chat app using libp2p and Rust.
 - Desktop node listens on both TCP (port 53493) and WebRTC (port 9090/udp).  
   Android uses TCP only.
 
-- Android app loads native `.so` libraries built from `Rust-Core`; JNI symbols exported correctly with `#[unsafe(no_mangle)]` and `--export-dynamic`.  
+- Android app loads native `.so` libraries built from `core`; JNI symbols exported correctly with `#[unsafe(no_mangle)]` and `--export-dynamic`.  
   The app works reliably between two Android devices (via mDNS) or between Android and desktop (via direct dial).
 
-- Web-React UI is functional, Tailwind CSS works, Vite serves WASM module correctly.  
+- web/react UI is functional, Tailwind CSS works, Vite serves WASM module correctly.  
   The browser dials the desktop's WebRTC address and initiates a connection.
 
-- Web-WASM compiles to WASM and runs in the browser. It creates a libp2p swarm with WebRTC transport, subscribes to `chat`, and polls events.
+- web/wasm compiles to WASM and runs in the browser. It creates a libp2p swarm with WebRTC transport, subscribes to `chat`, and polls events.
 
 ## Not Yet Working
 
@@ -51,23 +51,22 @@ Prerequisites: Rust stable (edition 2024), Node.js 24+, and the WebAssembly targ
 
 ### Desktop Node
 ```bash
-cd Rust-Core
-cargo run
+cargo run -p p2p-chat-cli
 ```
 The node prints its TCP and WebRTC listen addresses. Use the WebRTC address (including the certhash) for the browser client.
 
 ### Android App
 ```bash
-cd Android-Kotlin
+cd mobile/native-android
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
-- Ensure the desktop IP (`192.168.1.6`) is correct in `Rust-Core/src/ffi/mod.rs`.  
+- Ensure the desktop IP (`192.168.1.6`) is correct in `core/src/ffi/mod.rs`.  
 - Rebuild the native library if the IP changes: `bash build-android.sh`.
 
 ### Web App
 ```bash
-cd Web-React
+cd web/react
 npm ci
 npm run build
 npm run dev
@@ -76,14 +75,14 @@ npm run dev
 
 ## Notes
 - The `.gitignore` excludes `node_modules/`, `dist/`, and generated `.so` / `.wasm` files.
-- The `Android-Kotlin/app/src/main/jniLibs/` directory is ignored; native libraries must be rebuilt with `build-android.sh`.
-- The desktop IP is currently hardcoded – change it in `Rust-Core/src/ffi/mod.rs` (for Android) and `Web-React/src/App.tsx` (for Web) when the laptop’s IP changes.
+- The `mobile/native-android/app/src/main/jniLibs/` directory is ignored; native libraries must be rebuilt with `build-android.sh`.
+- The desktop IP is currently hardcoded – change it in `core/src/ffi/mod.rs` (for Android) and `web/react/src/App.tsx` (for Web) when the laptop’s IP changes.
 
 ### Build checks
 
 ```bash
 cargo test --locked -p p2p
-cd Web-React && npm ci && npm run build
+cd web/react && npm ci && npm run build
 ```
 
-`Web-WASM` is intentionally a separate Cargo workspace with its own lockfile, so native dependencies are not compiled for wasm32. `npm run build` generates the WASM bindings before bundling the UI. `npm run build:wasm` refreshes only those bindings. CI runs desktop tests and the production browser build. A successful build does not establish browser/desktop transport compatibility; see issue #2.
+`web/wasm` is intentionally a separate Cargo workspace with its own lockfile, so native dependencies are not compiled for wasm32. `npm run build` generates the WASM bindings before bundling the UI. `npm run build:wasm` refreshes only those bindings. CI runs desktop tests and the production browser build. A successful build does not establish browser/desktop transport compatibility; see issue #2.
