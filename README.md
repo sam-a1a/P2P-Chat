@@ -86,3 +86,7 @@ cd web/react && npm ci && npm run build
 ```
 
 `web/wasm` is intentionally a separate Cargo workspace with its own lockfile, so native dependencies are not compiled for wasm32. `npm run build` generates the WASM bindings before bundling the UI. `npm run build:wasm` refreshes only those bindings. CI runs desktop tests and the production browser build. A successful build does not establish browser/desktop transport compatibility; see issue #2.
+
+### Peer identities
+
+Each installation generates its own `identity.key`. Keep it private; losing it changes your peer ID. Keys included in older revisions are public and must not be reused. Existing users should stop the node, remove the old root/core/Rust-Core `identity.key` obtained from this repository, and restart. Git history has not been rewritten. New Unix keys have owner-only permissions.
