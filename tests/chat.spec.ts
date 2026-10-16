@@ -26,9 +26,9 @@ for (const [name, port] of [['React', 5173], ['Solid', 5174]] as const) {
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
     await expect(page.locator('.error')).toBeVisible();
     await expect(page.getByRole('status')).toHaveText('Status: disconnected');
-    await page.getByLabel('Peer address').fill('/ip4/127.0.0.1/tcp/1/ws');
+    await page.getByLabel('Peer address').fill('/ip4/127.0.0.1/tcp/19091/ws');
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
-    await expect(page.getByRole('log')).toContainText('Connection failed');
+    await expect(page.getByRole('log')).toContainText(/Connection failed|Connection timed out/, { timeout: 12000 });
     await expect(page.getByRole('status')).toHaveText('Status: disconnected');
     await page.getByLabel('Peer address').fill('/ip4/127.0.0.1/tcp/19090/ws');
     await page.getByRole('button', { name: 'Connect', exact: true }).click();

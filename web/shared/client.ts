@@ -26,7 +26,7 @@ export class ChatClient {
       if (generation !== this.generation) return;
       this.wasm = wasm;
       wasm.start_node(address.trim());
-      this.deadline = setTimeout(() => { this.event({ type: 'error', message: 'Connection timed out. Check the address and that the desktop node is running.' }); this.disconnect(); }, 20000);
+      this.deadline = setTimeout(() => { this.event({ type: 'error', message: 'Connection timed out. Check the address and that the desktop node is running.' }); this.disconnect(); }, 8000);
       this.timer = setInterval(() => {
         let json: string | undefined;
         while ((json = wasm.poll_event())) {
