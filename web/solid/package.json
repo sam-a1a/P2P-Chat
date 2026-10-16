@@ -8,6 +8,14 @@
     "build": "npm run build:wasm && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
-  "dependencies": { "solid-js": "2.0.0-rc.15", "@solidjs/web": "2.0.0-rc.15" },
-  "devDependencies": { "@solidjs/vite-plugin": "3.0.0-next.50", "vite": "^8.3.4", "typescript": "^5.9.3", "wasm-pack": "0.15.0" }
+  "dependencies": {
+    "solid-js": "2.0.0-rc.15",
+    "@solidjs/web": "2.0.0-rc.15"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.50",
+    "vite": "8.3.4",
+    "typescript": "7.0.2",
+    "wasm-pack": "0.15.0"
+  }
 }
