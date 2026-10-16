@@ -6,18 +6,23 @@ export default function App() {
   const [status, setStatus] = useState<Status>('disconnected');
   const [events, setEvents] = useState<ChatEvent[]>([]);
   const [text, setText] = useState('');
+  const [pending, setPending] = useState(false);
   const client = useRef<ChatClient | null>(null);
   const log = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const node = new ChatClient(e => setEvents(old => [...old.slice(-499), e]), setStatus);
+    const node = new ChatClient(e => {
+      setEvents(old => [...old.slice(-499), e]);
+      if (e.type === 'published') { setPending(false); setText(current => current.trim() === e.text ? '' : current); }
+      if (e.type === 'error') setPending(false);
+    }, status => { setStatus(status); if (status === 'disconnected') setPending(false); });
     client.current = node;
     return () => { node.disconnect(); client.current = null; };
   }, []);
   useEffect(() => { log.current?.scrollTo(0, log.current.scrollHeight); }, [events]);
   function send(e: React.FormEvent) {
     e.preventDefault();
-    try { client.current?.send(text); setText(''); }
-    catch (error) { setEvents(old => [...old, { type: 'error', message: String(error) }]); }
+    try { setPending(true); client.current?.send(text); }
+    catch (error) { setPending(false); setEvents(old => [...old, { type: 'error', message: String(error) }]); }
   }
   return <main>
     <h1>P2P Chat · React</h1><p>Connect to a desktop peer and chat on the shared LAN channel.</p>
@@ -34,7 +39,7 @@ export default function App() {
     </div>
     <form className="row" onSubmit={send}>
       <input aria-label="Message" placeholder="Type a message…" value={text} onChange={e => setText(e.target.value)} disabled={status !== 'connected'} maxLength={16000} />
-      <button disabled={status !== 'connected' || !text.trim()}>Send</button>
+      <button disabled={status !== 'connected' || pending || !text.trim()}>Send</button>
     </form>
     <small>“You” appears after the local peer accepts publication; it is not a delivery receipt. Messages are visible to peers on this channel and are not saved after reload.</small>
   </main>;

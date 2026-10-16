@@ -1,9 +1,11 @@
-use super::{FfiNode, ffi_destroy, ffi_free_string, ffi_poll_event,
-            ffi_dial, ffi_publish, ffi_shutdown, ffi_start, ffi_subscribe};
-use jni::objects::{JClass, JString, JByteArray};
-use jni::sys::{jlong, jstring};
+use super::{
+    FfiNode, ffi_destroy, ffi_dial, ffi_free_string, ffi_poll_event, ffi_publish, ffi_shutdown,
+    ffi_start, ffi_subscribe,
+};
 use jni::EnvUnowned;
 use jni::errors::ThrowRuntimeExAndDefault;
+use jni::objects::{JByteArray, JClass, JString};
+use jni::sys::{jlong, jstring};
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_example_p2p_P2pLib_start<'local>(
@@ -31,7 +33,9 @@ pub extern "system" fn Java_com_example_p2p_P2pLib_pollEvent<'local>(
     if raw.is_null() {
         return std::ptr::null_mut();
     }
-    let s = unsafe { std::ffi::CStr::from_ptr(raw) }.to_str().unwrap_or("{}");
+    let s = unsafe { std::ffi::CStr::from_ptr(raw) }
+        .to_str()
+        .unwrap_or("{}");
     let outcome = unowned_env.with_env(|env| -> Result<jstring, jni::errors::Error> {
         Ok(env.new_string(s)?.into_raw())
     });
@@ -90,7 +94,10 @@ pub extern "system" fn Java_com_example_p2p_P2pLib_destroy<'local>(
 }
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_example_p2p_P2pLib_dial<'local>(
-    mut unowned_env: EnvUnowned<'local>, _class: JClass<'local>, handle: jlong, address: JString<'local>,
+    mut unowned_env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    address: JString<'local>,
 ) {
     let outcome = unowned_env.with_env(|env| -> Result<(), jni::errors::Error> {
         ffi_dial(handle as *mut FfiNode, &address.try_to_string(env)?);

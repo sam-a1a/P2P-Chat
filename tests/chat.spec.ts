@@ -26,11 +26,13 @@ for (const [name, port] of [['React', 5173], ['Solid', 5174]] as const) {
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
     await expect(page.locator('.error')).toBeVisible();
     await expect(page.getByRole('status')).toHaveText('Status: disconnected');
+    await page.getByLabel('Peer address').fill('/ip4/127.0.0.1/tcp/1/ws');
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    await expect(page.getByRole('log')).toContainText('Connection failed');
+    await expect(page.getByRole('status')).toHaveText('Status: disconnected');
     await page.getByLabel('Peer address').fill('/ip4/127.0.0.1/tcp/19090/ws');
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText('Status: connected', { timeout: 20000 });
-    // Wait for the subscription handshake before testing publish acknowledgement.
-    await page.waitForTimeout(1500);
     const message = `${name} مرحبا ${Date.now()}`;
     await page.getByLabel('Message', { exact: true }).fill(message);
     await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -44,7 +46,6 @@ for (const [name, port] of [['React', 5173], ['Solid', 5174]] as const) {
     await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText('Status: connected');
-    await page.waitForTimeout(1500);
     const reconnect = `Reconnected ${name} ${Date.now()}`;
     node.stdin.write(reconnect + '\n');
     await expect(page.getByRole('log')).toContainText(reconnect);
@@ -58,7 +59,6 @@ test('React and Solid exchange messages through a desktop peer', async ({ browse
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText('Status: connected');
   }
-  await a.waitForTimeout(2000);
   for (const [sender, receiver, text] of [[a, b, 'React to Solid'], [b, a, 'Solid to React']] as const) {
     await sender.getByLabel('Message', { exact: true }).fill(text);
     await sender.getByRole('button', { name: 'Send', exact: true }).click();

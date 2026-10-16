@@ -3,17 +3,14 @@
 
 use p2p::{
     identity::load_or_create_keypair,
-    node::{start_node_with_config, NodeConfig},
+    node::{NodeConfig, start_node_with_config},
     types::NodeEvent,
 };
-use std::io::{BufRead};
+use std::io::BufRead;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info"),
-    )
-        .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let mut config = NodeConfig::default();
     let mut identity = "./identity.key".to_string();
@@ -21,10 +18,14 @@ async fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         if arg == "--help" {
-            println!("p2p-chat-cli [--identity PATH] [--tcp MULTIADDR] [--websocket MULTIADDR] [--dial MULTIADDR]");
+            println!(
+                "p2p-chat-cli [--identity PATH] [--tcp MULTIADDR] [--websocket MULTIADDR] [--dial MULTIADDR]"
+            );
             return Ok(());
         }
-        let value = args.next().ok_or_else(|| anyhow::anyhow!("Missing value for {arg}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Missing value for {arg}"))?;
         match arg.as_str() {
             "--identity" => identity = value,
             "--tcp" => config.tcp_address = value,
@@ -37,7 +38,9 @@ async fn main() -> anyhow::Result<()> {
     log::info!("Local peer ID: {}", keypair.public().to_peer_id());
 
     let mut handle = start_node_with_config(keypair, config)?;
-    if let Some(address) = dial { handle.dial(&address); }
+    if let Some(address) = dial {
+        handle.dial(&address);
+    }
 
     // Default topic for the CLI test.
     handle.subscribe("chat");
@@ -58,23 +61,20 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         while let Some(ev) = event_rx.recv().await {
             match &ev {
-                NodeEvent::PeerDiscovered { peer } =>
-                    println!("[+] Peer discovered: {peer}"),
-                NodeEvent::PeerExpired { peer } =>
-                    println!("[-] Peer expired: {peer}"),
-                NodeEvent::ConnectionEstablished { peer, address } =>
-                    println!("[✓] Connected: {peer} @ {address}"),
-                NodeEvent::ConnectionClosed { peer } =>
-                    println!("[✗] Disconnected: {peer}"),
+                NodeEvent::PeerDiscovered { peer } => println!("[+] Peer discovered: {peer}"),
+                NodeEvent::PeerExpired { peer } => println!("[-] Peer expired: {peer}"),
+                NodeEvent::ConnectionEstablished { peer, address } => {
+                    println!("[✓] Connected: {peer} @ {address}")
+                }
+                NodeEvent::ConnectionClosed { peer } => println!("[✗] Disconnected: {peer}"),
+                NodeEvent::PeerReady { peer } => println!("[ready] {peer}"),
                 NodeEvent::MessagePublished { text } => println!("[sent] {text}"),
                 NodeEvent::MessageReceived(msg) => {
                     let text = String::from_utf8_lossy(&msg.ciphertext);
                     println!("[msg] <{}> {}", &msg.from_peer[..8], text);
                 }
-                NodeEvent::ListeningOn { address } =>
-                    println!("[*] Listening: {address}"),
-                NodeEvent::Error { message } =>
-                    println!("[!] Error: {message}"),
+                NodeEvent::ListeningOn { address } => println!("[*] Listening: {address}"),
+                NodeEvent::Error { message } => println!("[!] Error: {message}"),
             }
         }
     });
@@ -86,8 +86,12 @@ async fn main() -> anyhow::Result<()> {
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let line = line?;
-        if line.trim() == "quit" { break; }
-        if line.is_empty() { continue; }
+        if line.trim() == "quit" {
+            break;
+        }
+        if line.is_empty() {
+            continue;
+        }
 
         handle.publish("chat", line.into_bytes());
     }

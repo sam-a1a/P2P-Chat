@@ -47,13 +47,29 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("p2p-key-{}", uuid::Uuid::new_v4()));
         let a_path = dir.join("a/identity.key");
         let b_path = dir.join("b/identity.key");
-        let a = load_or_create_keypair(a_path.to_str().unwrap()).unwrap().public().to_peer_id();
-        let b = load_or_create_keypair(b_path.to_str().unwrap()).unwrap().public().to_peer_id();
+        let a = load_or_create_keypair(a_path.to_str().unwrap())
+            .unwrap()
+            .public()
+            .to_peer_id();
+        let b = load_or_create_keypair(b_path.to_str().unwrap())
+            .unwrap()
+            .public()
+            .to_peer_id();
         assert_ne!(a, b);
-        assert_eq!(a, load_or_create_keypair(a_path.to_str().unwrap()).unwrap().public().to_peer_id());
-        #[cfg(unix)] {
+        assert_eq!(
+            a,
+            load_or_create_keypair(a_path.to_str().unwrap())
+                .unwrap()
+                .public()
+                .to_peer_id()
+        );
+        #[cfg(unix)]
+        {
             use std::os::unix::fs::PermissionsExt;
-            assert_eq!(std::fs::metadata(&a_path).unwrap().permissions().mode() & 0o777, 0o600);
+            assert_eq!(
+                std::fs::metadata(&a_path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
         }
         std::fs::write(&a_path, b"corrupt").unwrap();
         assert!(load_or_create_keypair(a_path.to_str().unwrap()).is_err());

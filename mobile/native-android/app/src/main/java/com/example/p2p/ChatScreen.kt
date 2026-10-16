@@ -32,7 +32,8 @@ fun ChatScreen(vm: ChatViewModel) {
     val messages by vm.messages.collectAsState()
     val connected by vm.connected.collectAsState()
     val listState = rememberLazyListState()
-    var input by rememberSaveable { mutableStateOf("") }
+    val input by vm.draft.collectAsState()
+    val sending by vm.sending.collectAsState()
     var address by rememberSaveable { mutableStateOf(vm.initialAddress) }
 
     LaunchedEffect(messages.size) {
@@ -77,18 +78,17 @@ fun ChatScreen(vm: ChatViewModel) {
         ) {
             OutlinedTextField(
                 value = input,
-                onValueChange = { input = it },
+                onValueChange = vm::updateDraft,
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Message") },
                 enabled = connected,
                 singleLine = true
             )
             Button(
-                enabled = connected && input.isNotBlank(),
+                enabled = connected && !sending && input.isNotBlank(),
                 onClick = {
                     if (input.isNotBlank()) {
-                        vm.send(input.trim())
-                        input = ""
+                        vm.send()
                     }
                 }
             ) {

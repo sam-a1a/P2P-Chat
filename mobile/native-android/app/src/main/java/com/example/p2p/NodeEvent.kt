@@ -14,6 +14,7 @@ sealed class NodeEvent {
         val ciphertext: ByteArray,
         val timestampSecs: Long
     ) : NodeEvent()
+    data class PeerReady(val peer: String) : NodeEvent()
     data class MessagePublished(val text: String) : NodeEvent()
     data class ListeningOn(val address: String) : NodeEvent()
     data class Error(val message: String) : NodeEvent()
@@ -49,6 +50,8 @@ sealed class NodeEvent {
                         timestampSecs = inner.getLong("timestamp_secs")
                     )
                 }
+
+                obj.has("PeerReady") -> PeerReady(obj.getJSONObject("PeerReady").getString("peer"))
 
                 obj.has("MessagePublished") -> MessagePublished(obj.getJSONObject("MessagePublished").getString("text"))
 

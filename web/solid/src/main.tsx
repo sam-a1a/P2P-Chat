@@ -7,16 +7,19 @@ function App() {
   const [status, setStatus] = createSignal<Status>('disconnected');
   const [events, setEvents] = createSignal<ChatEvent[]>([]);
   const [text, setText] = createSignal('');
+  const [pending, setPending] = createSignal(false);
   let log: HTMLDivElement | undefined;
   const client = new ChatClient(event => {
     setEvents(old => [...old.slice(-499), event]);
+    if (event.type === 'published') { setPending(false); setText(current => current.trim() === event.text ? '' : current); }
+    if (event.type === 'error') setPending(false);
     requestAnimationFrame(() => log?.scrollTo(0, log.scrollHeight));
-  }, setStatus);
+  }, status => { setStatus(status); if (status === 'disconnected') setPending(false); });
   onCleanup(() => client.disconnect());
   function send(event: SubmitEvent) {
     event.preventDefault();
-    try { client.send(text()); setText(''); }
-    catch (error) { setEvents(old => [...old, { type: 'error', message: String(error) }]); }
+    try { setPending(true); client.send(text()); }
+    catch (error) { setPending(false); setEvents(old => [...old, { type: 'error', message: String(error) }]); }
   }
   return <main>
     <h1>P2P Chat · Solid 2.0</h1><p>Connect to a desktop peer and chat on the shared LAN channel.</p>
@@ -33,7 +36,7 @@ function App() {
     </div>
     <form class="row" onSubmit={send}>
       <input aria-label="Message" placeholder="Type a message…" value={text()} onInput={e => setText(e.currentTarget.value)} disabled={status() !== 'connected'} maxlength={16000} />
-      <button disabled={status() !== 'connected' || !text().trim()}>Send</button>
+      <button disabled={status() !== 'connected' || pending() || !text().trim()}>Send</button>
     </form>
     <small>“You” appears after the local peer accepts publication; it is not a delivery receipt. Messages are visible to peers on this channel and are not saved after reload.</small>
   </main>;
