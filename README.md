@@ -55,11 +55,11 @@ Use a distinct identity path and ports for each local node. Type `quit` to stop.
 
 ## Android
 
-Requires JDK 21 or newer (set `JAVA_HOME`), Android SDK 37.0, Android NDK, and Rust Android targets.
+Requires JDK 21 or newer (set `JAVA_HOME`), Android SDK 37.0, Android NDK 29.0.13846066, and Rust Android targets.
 
 ```bash
 cargo install cargo-ndk --locked
-export ANDROID_NDK_HOME=/path/to/android/sdk/ndk/version
+export ANDROID_NDK_HOME=/path/to/android/sdk/ndk/29.0.13846066
 bash core/build-android.sh
 cd mobile/native-android
 ./gradlew assembleDebug lintDebug
