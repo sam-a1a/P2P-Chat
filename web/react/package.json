@@ -1,0 +1,23 @@
+{
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "wasm-pack": "0.15.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build:wasm": "cd ../wasm && wasm-pack build --locked --target web --out-dir pkg",
+    "build": "npm run build:wasm && tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "private": true,
+  "name": "@p2p-chat/react",
+  "type": "module"
+}

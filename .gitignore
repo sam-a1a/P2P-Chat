@@ -6,3 +6,9 @@ dist/
 node_modules/
 dist/
 src/wasm/
+identity.key
+*.db
+*.db-shm
+*.db-wal
+playwright-report/
+test-results/
