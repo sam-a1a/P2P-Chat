@@ -2,7 +2,7 @@ use crate::{
     error::{P2pError, Result},
     types::ChatMessage,
 };
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 pub struct MessageStore {
     conn: Connection,
@@ -10,8 +10,7 @@ pub struct MessageStore {
 
 impl MessageStore {
     pub fn open(path: &str) -> Result<Self> {
-        let conn =
-            Connection::open(path).map_err(|e| P2pError::Storage(e.to_string()))?;
+        let conn = Connection::open(path).map_err(|e| P2pError::Storage(e.to_string()))?;
 
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
@@ -26,7 +25,7 @@ impl MessageStore {
              CREATE INDEX IF NOT EXISTS idx_messages_topic
                  ON messages(topic, timestamp_secs);",
         )
-            .map_err(|e| P2pError::Storage(e.to_string()))?;
+        .map_err(|e| P2pError::Storage(e.to_string()))?;
 
         Ok(Self { conn })
     }
@@ -65,10 +64,10 @@ impl MessageStore {
         let rows = stmt
             .query_map(params![topic], |row| {
                 Ok(ChatMessage {
-                    id:             row.get(0)?,
-                    from_peer:      row.get(1)?,
-                    topic:          row.get(2)?,
-                    ciphertext:     row.get(3)?,
+                    id: row.get(0)?,
+                    from_peer: row.get(1)?,
+                    topic: row.get(2)?,
+                    ciphertext: row.get(3)?,
                     timestamp_secs: row.get::<_, i64>(4)? as u64,
                 })
             })

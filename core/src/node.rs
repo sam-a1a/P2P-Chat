@@ -168,7 +168,10 @@ impl Node {
                 peer_id, endpoint, ..
             } => {
                 log::info!("connected: {peer_id}");
-                self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                self.swarm
+                    .behaviour_mut()
+                    .gossipsub
+                    .add_explicit_peer(&peer_id);
                 let _ = self.event_tx.send(NodeEvent::ConnectionEstablished {
                     peer: peer_id.to_string(),
                     address: endpoint.get_remote_address().to_string(),
@@ -238,7 +241,9 @@ impl Node {
             ChatBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic }) => {
                 log::debug!("{peer_id} subscribed to {topic}");
                 if topic == gossipsub::IdentTopic::new("chat").hash() {
-                    let _ = self.event_tx.send(NodeEvent::PeerReady { peer: peer_id.to_string() });
+                    let _ = self.event_tx.send(NodeEvent::PeerReady {
+                        peer: peer_id.to_string(),
+                    });
                 }
             }
             ChatBehaviourEvent::Identify(identify::Event::Received { peer_id, info, .. }) => {

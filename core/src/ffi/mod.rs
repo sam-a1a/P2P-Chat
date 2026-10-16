@@ -25,7 +25,6 @@ pub struct FfiNode {
 }
 
 pub(super) fn ffi_start(key_path: &str, _db_path: &str) -> *mut FfiNode {
-
     #[cfg(target_os = "android")]
     {
         android_logger::init_once(
@@ -52,7 +51,6 @@ pub(super) fn ffi_start(key_path: &str, _db_path: &str) -> *mut FfiNode {
             return std::ptr::null_mut();
         }
     };
-
 
     Box::into_raw(Box::new(FfiNode { handle }))
 }
@@ -110,5 +108,7 @@ pub(super) fn ffi_destroy(ptr: *mut FfiNode) {
     }
 }
 pub(super) fn ffi_dial(ptr: *mut FfiNode, address: &str) {
-    if !ptr.is_null() { unsafe { &*ptr }.handle.dial(address); }
+    if !ptr.is_null() {
+        unsafe { &*ptr }.handle.dial(address);
+    }
 }

@@ -33,28 +33,15 @@ where
 
 #[derive(Serialize)]
 pub enum NodeEvent {
-    PeerDiscovered {
-        peer: String,
-    },
-    PeerExpired {
-        peer: String,
-    },
-    ConnectionEstablished {
-        peer: String,
-        address: String,
-    },
-    ConnectionClosed {
-        peer: String,
-    },
+    PeerDiscovered { peer: String },
+    PeerExpired { peer: String },
+    ConnectionEstablished { peer: String, address: String },
+    ConnectionClosed { peer: String },
     MessageReceived(ChatMessage),
     MessagePublished { text: String },
     PeerReady { peer: String },
-    ListeningOn {
-        address: String,
-    },
-    Error {
-        message: String,
-    },
+    ListeningOn { address: String },
+    Error { message: String },
 }
 
 pub enum NodeCommand {

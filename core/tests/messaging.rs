@@ -36,14 +36,8 @@ async fn exchange(websocket: bool) {
     if let NodeEvent::ListeningOn { address } = listen {
         b.dial(&address);
     }
-    event(&mut a, |e| {
-        matches!(e, NodeEvent::PeerReady { .. })
-    })
-    .await;
-    event(&mut b, |e| {
-        matches!(e, NodeEvent::PeerReady { .. })
-    })
-    .await;
+    event(&mut a, |e| matches!(e, NodeEvent::PeerReady { .. })).await;
+    event(&mut b, |e| matches!(e, NodeEvent::PeerReady { .. })).await;
     a.publish("chat", "Hello مرحبا".as_bytes().to_vec());
     let received = event(&mut b, |e| matches!(e, NodeEvent::MessageReceived(_))).await;
     if let NodeEvent::MessageReceived(message) = received {
