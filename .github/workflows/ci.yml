@@ -59,7 +59,7 @@ jobs:
           targets: aarch64-linux-android
       - uses: Swatinem/rust-cache@v2.9.2
       - uses: android-actions/setup-android@v4.0.4
-      - uses: gradle/actions/setup-gradle@v6.4.0
+      - uses: gradle/actions/setup-gradle@v6.4.1
       - run: cargo install cargo-ndk --version 4.1.2 --locked
       - run: |
           sdkmanager "ndk;29.0.13846066" "platforms;android-37.0"
